@@ -1,0 +1,26 @@
+# --- Core: Strands Agents SDK (the agent framework this project is built on) ---
+strands-agents>=1.55.0
+strands-agents-tools>=0.8.0
+
+# --- AWS ---
+boto3>=1.35.0
+# Bedrock AgentCore Runtime entrypoint. Install separately if the wheel is
+# unavailable for your platform: pip install bedrock-agentcore
+bedrock-agentcore>=0.1.0
+
+# --- Web UI (FastAPI + HTMX + Jinja2, no build step) ---
+fastapi>=0.115.0
+uvicorn>=0.32.0
+jinja2>=3.1.0
+python-multipart>=0.0.12
+httpx>=0.27.0
+
+# --- Data / config ---
+pydantic>=2.9.0
+python-dotenv>=1.0.0
+pyyaml>=6.0.0
+
+# --- Dev / test ---
+pytest>=8.3.0
+pytest-asyncio>=0.24.0
+ruff>=0.8.0

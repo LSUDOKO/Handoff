@@ -1,0 +1,25 @@
+{
+  "workflow_id": "meeting-followup",
+  "name": "Meeting Follow-up",
+  "description": "After each meeting on my calendar ends, take the notes or transcript, pull out the commitments, file mine as tickets, and draft a short recap to attendees. Ask me before sending anything to people outside the company.",
+  "status": "draft",
+  "trigger": { "type": "event", "schedule": "", "timezone": "America/New_York" },
+  "mcp_tools": ["gmail", "linear"],
+  "steps": [
+    { "id": "notes", "action": "gmail.search_threads", "params": { "query": "subject:(notes OR transcript) newer_than:2h" } },
+    { "id": "recall", "action": "memory.recall_preferences", "params": { "preference_key": "meeting_followup_rules" } },
+    { "id": "classify", "action": "llm_classify", "input_from": "notes",
+      "categories": ["my_commitment", "their_commitment", "internal_recap", "external_recap", "ambiguous"] },
+    { "id": "auto_actions", "rules": [
+      { "category": "my_commitment", "action": "linear.create_issue", "auto": true, "params": { "labels": ["meeting"] } },
+      { "category": "internal_recap", "action": "gmail.create_draft", "auto": true }
+    ] },
+    { "id": "human_gate", "category": "external_recap", "action": "interrupt",
+      "present": ["meeting", "attendees", "draft", "suggested_action", "reasoning", "confidence"],
+      "options": ["draft_reply", "file_ticket", "skip"] }
+  ],
+  "completion": { "notify": "console", "channel": "",
+    "message": "Follow-up ready: {auto_count} tickets and drafts prepared, {interrupt_count} waiting on you." },
+  "memory": { "learn_from_decisions": true, "preference_key": "meeting_followup_rules" },
+  "confidence_threshold": 0.75
+}

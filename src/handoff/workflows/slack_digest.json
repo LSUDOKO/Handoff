@@ -1,0 +1,25 @@
+{
+  "workflow_id": "slack-channel-digest",
+  "name": "Slack Channel Digest",
+  "description": "Every evening at 6pm, read the channels I can't keep up with. Summarise what happened, file anything that's clearly an action item for me as a ticket, and ask me about messages where I'm mentioned but the ask is unclear.",
+  "status": "draft",
+  "trigger": { "type": "cron", "schedule": "0 18 * * 1-5", "timezone": "America/New_York" },
+  "mcp_tools": ["slack", "linear"],
+  "steps": [
+    { "id": "read", "action": "slack.read_channel", "params": { "channels": ["#product", "#eng", "#customers"], "since": "12h" } },
+    { "id": "recall", "action": "memory.recall_preferences", "params": { "preference_key": "slack_digest_rules" } },
+    { "id": "classify", "action": "llm_classify", "input_from": "read",
+      "categories": ["fyi", "action_for_me", "mention_unclear", "ambiguous"] },
+    { "id": "auto_actions", "rules": [
+      { "category": "fyi", "action": "skip", "auto": true },
+      { "category": "action_for_me", "action": "linear.create_issue", "auto": true, "params": { "labels": ["from-slack"] } }
+    ] },
+    { "id": "human_gate", "category": "mention_unclear", "action": "interrupt",
+      "present": ["channel", "author", "message", "suggested_action", "reasoning", "confidence"],
+      "options": ["file_ticket", "draft_reply", "skip"] }
+  ],
+  "completion": { "notify": "slack", "channel": "#me",
+    "message": "Evening digest: {auto_count} items handled, {interrupt_count} need a word from you." },
+  "memory": { "learn_from_decisions": true, "preference_key": "slack_digest_rules" },
+  "confidence_threshold": 0.7
+}

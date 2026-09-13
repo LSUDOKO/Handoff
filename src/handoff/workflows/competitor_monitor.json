@@ -1,0 +1,78 @@
+{
+  "workflow_id": "competitor-pricing-watch",
+  "name": "Weekly Competitor Pricing Watch",
+  "description": "Every Monday, read the competitor's pricing page. If nothing moved, say nothing. If something moved, summarise the diff to #competitive-intel \u2014 and ask me before posting anything that reads as a strategic call.",
+  "status": "active",
+  "trigger": {
+    "type": "cron",
+    "schedule": "0 9 * * 1",
+    "timezone": "America/New_York"
+  },
+  "mcp_tools": [
+    "web",
+    "browser",
+    "slack"
+  ],
+  "steps": [
+    {
+      "id": "capture",
+      "action": "browser.navigate",
+      "params": {
+        "url": "https://competitor.example/pricing"
+      }
+    },
+    {
+      "id": "diff",
+      "action": "llm_classify",
+      "input_from": "capture",
+      "categories": [
+        "no_change",
+        "minor_change",
+        "material_change",
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "auto_actions",
+      "rules": [
+        {
+          "category": "no_change",
+          "action": "skip",
+          "auto": true
+        },
+        {
+          "category": "minor_change",
+          "action": "slack.post_message",
+          "auto": true
+        }
+      ]
+    },
+    {
+      "id": "human_gate",
+      "category": "material_change",
+      "action": "interrupt",
+      "present": [
+        "diff",
+        "suggested_action",
+        "reasoning",
+        "confidence"
+      ],
+      "options": [
+        "post_to_slack",
+        "file_ticket",
+        "draft_reply",
+        "skip"
+      ]
+    }
+  ],
+  "completion": {
+    "notify": "slack",
+    "channel": "#competitive-intel",
+    "message": "Pricing watch done. {auto_count} checks handled, {interrupt_count} flagged for you."
+  },
+  "memory": {
+    "learn_from_decisions": true,
+    "preference_key": "competitor_watch_rules"
+  },
+  "confidence_threshold": 0.75
+}

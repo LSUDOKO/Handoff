@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Handoff — Log{% endblock %}
+{% block body %}
+<main>
+
+  <section class="standing">
+    <div>
+      <span class="v {% if stats.pending %}needs pulse{% endif %}">{{ stats.pending }}</span>
+      <span class="k">waiting on you</span>
+    </div>
+    <div>
+      <span class="v done">{{ stats.auto_actions }}</span>
+      <span class="k">handled on its own</span>
+    </div>
+    <div>
+      <span class="v">{{ stats.human_decisions }}</span>
+      <span class="k">you decided</span>
+    </div>
+    <div>
+      <span class="v">{{ stats.memory_applied }}</span>
+      <span class="k">from rules you set</span>
+    </div>
+    <div>
+      <span class="v">{{ stats.runs }}</span>
+      <span class="k">runs</span>
+    </div>
+  </section>
+
+  <section class="block" id="live-block" hidden>
+    <h2>Right now</h2>
+    {% with run_id="*", history=[] %}{% include "_live.html" %}{% endwith %}
+  </section>
+
+  <section class="block" id="waiting">
+    <h2>Waiting on you <span class="count">{{ pending|length }}</span></h2>
+    {% if pending %}
+    <ul class="waiting">
+      {% for item in pending %}
+      <li>
+        <a href="/decide/{{ item.interrupt_id }}">
+          <span class="subject">{{ item.item.subject or item.item.summary }}</span>
+          <span class="who">{{ item.item.sender }}</span>
+          <span class="verdict">
+            <b>{{ (item.agent_analysis.confidence * 100)|round|int }}%</b>
+            sure about {{ item.agent_analysis.suggested_action|action_phrase }}
+          </span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">Nothing needs you. Everything it ran into, it could call on its own.</p>
+    {% endif %}
+  </section>
+
+  <section class="block">
+    <h2>Workflows <span class="count">{{ workflows|length }}</span></h2>
+    {% if workflows %}
+    <ul class="flows">
+      {% for flow in workflows %}
+      <li id="flow-{{ flow.workflow_id }}">
+        <span class="name">{{ flow.name }}</span>
+        <span class="desc">{{ flow.description }}</span>
+        <span class="meta">
+          {{ flow.schedule_readable }}
+          {% if flow.mcp_tools %}&nbsp;&nbsp;{{ flow.mcp_tools|join(' ') }}{% endif %}
+          {% if flow.last_run %}&nbsp;&nbsp;last run {{ flow.last_run }}{% endif %}
+        </span>
+        <span class="controls">
+          <span class="state {{ flow.status }}">{{ flow.status }}</span>
+          <button hx-post="/workflow/{{ flow.workflow_id }}/run"
+                  hx-target="#flow-{{ flow.workflow_id }}"
+                  hx-swap="outerHTML"
+                  hx-disabled-elt="this">Run now</button>
+          {% if flow.last_run_id %}
+          <a class="button" href="/trace/{{ flow.last_run_id }}">Trace</a>
+          {% endif %}
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">No workflows yet. <a href="/chat">Describe one in chat</a> and Handoff will build it.</p>
+    {% endif %}
+  </section>
+
+  {% if rules %}
+  <section class="block">
+    <h2>What it learned from you <span class="count">{{ rules|length }}</span></h2>
+    <ul class="rules">
+      {% for rule in rules %}
+      <li>
+        <span class="pattern">{{ rule.pattern }}</span>
+        <span class="act">{{ rule.action }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  <section class="block">
+    <h2>Activity <span class="count">most recent first</span></h2>
+    {% if audit %}
+    <table class="log">
+      <thead>
+        <tr><th>Time</th><th>Did</th><th>To</th><th>Decided by</th></tr>
+      </thead>
+      <tbody>
+        {% for entry in audit %}
+        <tr>
+          <td class="at">{{ entry.at }}</td>
+          <td class="what">{{ entry.action }}</td>
+          <td class="item">{{ entry.item_id }}</td>
+          <td><span class="by {{ entry.decision_by }}">{{ entry.decided_label }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">Nothing has run yet. Press <em>Run now</em> on a workflow to watch one go.</p>
+    {% endif %}
+  </section>
+
+</main>
+{% endblock %}

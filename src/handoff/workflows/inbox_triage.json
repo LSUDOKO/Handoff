@@ -1,0 +1,56 @@
+{
+  "workflow_id": "inbox-triage-morning",
+  "name": "Morning Inbox Triage",
+  "description": "Triage unread mail before standup: file real asks, archive noise, draft replies to my manager, and ask me about anything genuinely unclear.",
+  "status": "active",
+  "trigger": {
+    "type": "cron",
+    "schedule": "0 8 * * 1-5",
+    "timezone": "America/New_York"
+  },
+  "mcp_tools": ["gmail", "linear", "slack"],
+  "steps": [
+    {
+      "id": "fetch_emails",
+      "action": "gmail.search_threads",
+      "params": { "query": "is:unread newer_than:12h", "max_results": 20 }
+    },
+    {
+      "id": "recall",
+      "action": "memory.recall_preferences",
+      "params": { "preference_key": "inbox_triage_rules" }
+    },
+    {
+      "id": "classify",
+      "action": "llm_classify",
+      "input_from": "fetch_emails",
+      "categories": ["teammate_request", "newsletter", "manager", "automated", "ambiguous"]
+    },
+    {
+      "id": "auto_actions",
+      "rules": [
+        { "category": "teammate_request", "action": "linear.create_issue", "auto": true, "params": { "labels": ["inbox"] } },
+        { "category": "newsletter", "action": "gmail.archive", "auto": true },
+        { "category": "manager", "action": "gmail.create_draft", "auto": true },
+        { "category": "automated", "action": "linear.create_issue", "auto": true, "params": { "labels": ["automated"] } }
+      ]
+    },
+    {
+      "id": "human_gate",
+      "category": "ambiguous",
+      "action": "interrupt",
+      "present": ["email_summary", "sender", "suggested_action", "reasoning", "confidence"],
+      "options": ["file_ticket", "archive", "draft_reply", "skip"]
+    }
+  ],
+  "completion": {
+    "notify": "slack",
+    "channel": "#daily-triage",
+    "message": "Morning triage complete. {auto_count} handled on my own, {interrupt_count} decided by you, {memory_count} handled from rules you set earlier."
+  },
+  "memory": {
+    "learn_from_decisions": true,
+    "preference_key": "inbox_triage_rules"
+  },
+  "confidence_threshold": 0.7
+}

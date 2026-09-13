@@ -1,0 +1,25 @@
+# Secrets — never commit
+.env
+*.env.local
+**/.env
+
+# Python
+.venv*/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Handoff local state
+.handoff-state/
+**/.handoff-state/
+
+# Node / Deno
+node_modules/
+.deno/
+
+# Tooling
+.playwright-mcp/
+*.log
+.DS_Store

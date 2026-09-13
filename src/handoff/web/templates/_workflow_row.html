@@ -1,0 +1,28 @@
+<li id="flow-{{ flow.workflow_id }}">
+  <span class="name">{{ flow.name }}</span>
+  <span class="desc">{{ flow.run_summary }}</span>
+  <span class="meta">
+    {{ flow.schedule_readable }}
+    {% if flow.mcp_tools %}&nbsp;&nbsp;{{ flow.mcp_tools|join(' ') }}{% endif %}
+    {% if flow.last_run %}&nbsp;&nbsp;last run {{ flow.last_run }}{% endif %}
+  </span>
+  <span class="controls">
+    {% if flow.pending_count %}
+    <a class="button needs" href="/#waiting">{{ flow.pending_count }} need{% if flow.pending_count == 1 %}s{% endif %} you</a>
+    {% else %}
+    <span class="state {{ flow.status }}">{{ flow.status }}</span>
+    {% endif %}
+    <button hx-post="/workflow/{{ flow.workflow_id }}/run"
+            hx-target="#flow-{{ flow.workflow_id }}"
+            hx-swap="outerHTML"
+            hx-disabled-elt="this">Run again</button>
+    {% if flow.last_run_id %}
+    <a class="button" href="/trace/{{ flow.last_run_id }}">Trace</a>
+    {% endif %}
+  </span>
+  {% if flow.live_run_id %}
+  <div class="row-live">
+    {% with run_id=flow.live_run_id, history=[] %}{% include "_live.html" %}{% endwith %}
+  </div>
+  {% endif %}
+</li>

@@ -1,0 +1,37 @@
+Handoff
+Copyright 2026 The Handoff Authors
+
+Licensed under the Apache License, Version 2.0.
+See the LICENSE file for the full terms.
+
+------------------------------------------------------------------------
+Third-party dependencies
+------------------------------------------------------------------------
+
+Handoff is built on the Strands Agents SDK and uses the libraries below.
+None of their source is vendored into this repository; each is installed
+from its own distribution and remains under its own licence.
+
+  strands-agents            Apache-2.0    https://strandsagents.com
+  strands-agents-tools      Apache-2.0
+  bedrock-agentcore         Apache-2.0    (optional: AWS deployment)
+  boto3 / botocore          Apache-2.0    (optional: AWS)
+  anthropic                 MIT           (optional: Anthropic provider)
+  openai                    Apache-2.0    (optional: Groq / OpenAI-compatible)
+  mcp                       MIT
+  mcp-server-fetch          MIT           (optional: credential-free web tool)
+  fastapi                   MIT
+  starlette                 BSD-3-Clause
+  uvicorn                   BSD-3-Clause
+  jinja2                    BSD-3-Clause
+  pydantic                  MIT
+  httpx                     BSD-3-Clause
+  python-dotenv             BSD-3-Clause
+  PyYAML                    MIT
+  json-repair               MIT
+  pywebview                 BSD-3-Clause  (optional: desktop window)
+
+Served to the browser from a CDN, not redistributed here:
+
+  htmx                      BSD-2-Clause
+  Archivo, Newsreader       SIL Open Font License 1.1

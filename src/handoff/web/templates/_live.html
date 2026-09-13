@@ -1,0 +1,12 @@
+<div class="live" id="live-{{ run_id }}" data-run="{{ run_id }}">
+  <div class="live-head">
+    <span class="live-dot" aria-hidden="true"></span>
+    <span class="live-title">Watching it work</span>
+    <span class="live-state" data-role="state">running</span>
+  </div>
+  <ol class="live-feed" data-role="feed">
+    {% for e in history %}
+    <li class="ev ev-{{ e.kind }}"><span class="ev-k">{{ e.kind }}</span>{{ e.text }}</li>
+    {% endfor %}
+  </ol>
+</div>

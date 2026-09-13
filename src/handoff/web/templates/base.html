@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Handoff{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2" crossorigin="anonymous"></script>
+  <script defer src="/static/handoff.js"></script>
+</head>
+<body data-voice="{{ 'on' if voice_enabled else 'off' }}">
+{% block chrome %}
+<header class="masthead">
+  <div class="masthead-top">
+    <div>
+      <div class="wordmark">Handoff<span>.</span></div>
+      <p class="tagline">It ran while you were away. Here's what it did.</p>
+    </div>
+    <p class="config-status">{{ settings.provider }}: {{ settings.model_id }}{% if settings.use_mock_tools %}, synthetic inbox{% endif %}
+      <button type="button" class="voice-toggle" data-role="voice-toggle" title="Read decisions and replies aloud">Voice off</button>
+    </p>
+  </div>
+  <nav>
+    <a href="/"{% if page == 'dashboard' %} aria-current="page"{% endif %}>Log</a>
+    <a href="/chat"{% if page == 'chat' %} aria-current="page"{% endif %}>Build a workflow</a>
+  </nav>
+</header>
+{% endblock %}
+{% block body %}{% endblock %}
+</body>
+</html>

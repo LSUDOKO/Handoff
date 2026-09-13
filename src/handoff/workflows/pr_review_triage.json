@@ -1,0 +1,25 @@
+{
+  "workflow_id": "pr-review-triage",
+  "name": "PR Review Triage",
+  "description": "Every weekday at 9am, look at open pull requests I've been asked to review. Small, well-described PRs from teammates get a first-pass review comment drafted. Anything touching auth, billing or migrations gets flagged to me before any comment is left.",
+  "status": "draft",
+  "trigger": { "type": "cron", "schedule": "0 9 * * 1-5", "timezone": "America/New_York" },
+  "mcp_tools": ["github", "slack"],
+  "steps": [
+    { "id": "fetch_prs", "action": "github.list_prs", "params": { "review_requested": "me", "state": "open" } },
+    { "id": "recall", "action": "memory.recall_preferences", "params": { "preference_key": "pr_review_rules" } },
+    { "id": "classify", "action": "llm_classify", "input_from": "fetch_prs",
+      "categories": ["routine", "needs_context", "sensitive_area", "ambiguous"] },
+    { "id": "auto_actions", "rules": [
+      { "category": "routine", "action": "github.review_pr", "auto": true, "params": { "event": "COMMENT" } },
+      { "category": "needs_context", "action": "slack.post_message", "auto": true, "params": { "channel": "#eng-reviews" } }
+    ] },
+    { "id": "human_gate", "category": "sensitive_area", "action": "interrupt",
+      "present": ["title", "author", "files_touched", "suggested_action", "reasoning", "confidence"],
+      "options": ["review_now", "request_changes", "assign_other", "skip"] }
+  ],
+  "completion": { "notify": "slack", "channel": "#eng-reviews",
+    "message": "Review triage done. {auto_count} first-pass comments drafted, {interrupt_count} flagged for you." },
+  "memory": { "learn_from_decisions": true, "preference_key": "pr_review_rules" },
+  "confidence_threshold": 0.8
+}

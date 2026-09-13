@@ -1,0 +1,15 @@
+.git
+.github
+.venv*
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.handoff-state
+.env
+docs/
+tests/
+scripts/
+infra/
+*.md
+Makefile

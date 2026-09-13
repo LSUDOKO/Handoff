@@ -1,0 +1,84 @@
+{% if payload.resolved %}
+<div class="resolved">
+  <span class="stamp">Decided</span>
+  <p>{{ resolved_line }}</p>
+  {% if siblings %}
+  <ul class="next-up">
+    {% for s in siblings %}
+    <li><a href="/decide/{{ s.interrupt_id }}">{{ s.item.subject or s.item.summary }} <span>{{ s.item.sender }}</span></a></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p><a class="button" href="/">Back to the log</a></p>
+  {% endif %}
+</div>
+{% else %}
+<span class="stamp">Waiting on you</span>
+{% if siblings %}<span class="siblings">and {{ siblings|length }} more after this</span>{% endif %}
+<div class="say" data-role="say" data-text="{{ voice_prompt }}" hidden></div>
+
+<h1>{{ payload.item.subject or payload.item.summary }}</h1>
+<p class="from">{{ payload.item.sender }}</p>
+
+{% if payload.item.snippet %}
+<blockquote class="quote">{{ payload.item.snippet }}</blockquote>
+{% endif %}
+
+<section class="reasoning">
+  <h2>Why it stopped</h2>
+  <p>{{ payload.agent_analysis.reasoning or payload.reason }}</p>
+
+  <div class="gauge">
+    <div class="gauge-scale" role="img"
+         aria-label="Confidence {{ confidence_pct }} percent, against a threshold of {{ threshold_pct }} percent">
+      {% for i in range(20) %}
+      <i class="{% if i < filled_segments %}filled{% if clears %} clears{% endif %}{% endif %}"></i>
+      {% endfor %}
+      <span class="gauge-threshold" style="left: {{ threshold_pct }}%"></span>
+    </div>
+    <div class="gauge-legend">
+      <span><b>{{ confidence_pct }}%</b> sure {{ payload.agent_analysis.suggested_action|action_phrase }} is right</span>
+      <span>needs {{ threshold_pct }}% to act alone</span>
+    </div>
+  </div>
+</section>
+
+<section class="choices">
+  <h2>Your call</h2>
+  <p class="hint">{% if siblings %}One click each. Once all {{ siblings|length + 1 }} are answered, the run picks up where it left off.{% else %}One click. It picks up where it left off and finishes the run.{% endif %}</p>
+
+  <form hx-post="/decide/{{ payload.interrupt_id }}"
+        hx-target="#decision"
+        hx-swap="innerHTML"
+        hx-disabled-elt="find button"
+        data-role="decision-form"
+        data-options="{{ options|map(attribute='value')|join(',') }}">
+    <div class="voice-answer" data-role="voice-answer">
+      <button type="button" class="mic mic-big" data-role="mic" aria-label="Answer by voice" title="Hold to talk">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2z"/></svg>
+      </button>
+      <span class="heard" data-role="heard">Hold the mic and say <em>archive it</em>, <em>file a ticket</em>, <em>draft a reply</em>, or <em>leave it</em>.</span>
+    </div>
+    <div class="options">
+      {% for option in options %}
+      <button type="submit" name="action" value="{{ option.value }}"
+              class="{% if option.suggested %}suggested{% endif %}">
+        {{ option.label }}
+        <small>{{ option.hint }}</small>
+      </button>
+      {% endfor %}
+    </div>
+
+    <div class="note">
+      <label for="note">Anything it should know for next time? (optional)</label>
+      <input type="text" name="note" id="note"
+             placeholder="e.g. cold outreach, never worth a ticket">
+    </div>
+  </form>
+
+  <p class="aftermath">
+    Whatever you choose here becomes a rule. Next time something like this
+    arrives, it handles it the way you just did instead of asking again.
+  </p>
+</section>
+{% endif %}
