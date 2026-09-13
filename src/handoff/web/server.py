@@ -2250,7 +2250,8 @@ def _settings_page(request: Request, flash: str = "", kind: str = "ok"):
     return templates.TemplateResponse(
         request=request,
         name="settings.html",
-        context=_context(request, "settings", flash=flash, flash_kind=kind, models=settings_mod.current()),
+        context=_context(request, "settings",
+            speech_label=_speech_label(), flash=flash, flash_kind=kind, models=settings_mod.current()),
     )
 
 
