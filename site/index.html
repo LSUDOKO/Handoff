@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Handoff — Describe it. Hand it off. It runs.</title>
+<meta name="description" content="Describe a recurring chore in a sentence. Handoff turns it into a scheduled workflow on the Strands Agents SDK, runs it unattended, and stops to ask you only about the things it genuinely cannot judge.">
+<meta property="og:title" content="Handoff — Describe it. Hand it off. It runs.">
+<meta property="og:description" content="Autonomous workflows with a confidence-gated human decision loop. Talk to it, watch it work, answer once — it asks less next time. Open source, Apache-2.0.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="/screens/overview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='8' fill='%23e8dcc4'/%3E%3Crect x='9' y='9' width='10' height='10' rx='2' fill='%23433a2f' transform='rotate(45 14 14)'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Comfortaa:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/assets/site.css">
+<script>(function(){try{var t=localStorage.getItem("handoff-theme");if(t==="dark"||t==="light"){document.documentElement.dataset.theme=t;}}catch(e){}})();</script>
+</head>
+<body>
+<div class="page-sheet">
+<!-- nav:start -->
+<nav class="site-nav" aria-label="Site">
+  <div class="wrap nav-row">
+    <a class="brand" href="/" aria-label="Handoff home">
+      <span class="brand-mark" aria-hidden="true"><span></span></span>
+      <span class="wordmark">handoff</span>
+    </a>
+    <div class="nav-tabs">
+      <a href="/#product" data-tab="product">Product</a>
+      <a href="/docs/getting-started" data-tab="docs">Docs</a>
+      <a href="https://github.com/LSUDOKO/Handoff" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a class="nav-pill-link" href="/#setup" aria-label="Install Handoff">
+        <span class="nav-pill" aria-hidden="true">
+          <span class="nav-legends">
+            <span class="nav-label" data-legend="a"><span style="transition-delay:0ms">C</span><span style="transition-delay:35ms">L</span><span style="transition-delay:70ms">I</span></span>
+            <span class="nav-label" data-legend="b"><span style="transition-delay:0ms">I</span><span style="transition-delay:35ms">n</span><span style="transition-delay:70ms">s</span><span style="transition-delay:105ms">t</span><span style="transition-delay:140ms">a</span><span style="transition-delay:175ms">l</span><span style="transition-delay:210ms">l</span></span>
+          </span>
+        </span>
+      </a>
+    </div>
+    <div class="nav-actions">
+      <button class="icon-btn theme-toggle" type="button" aria-label="Switch theme">
+        <span class="theme-icon theme-icon-moon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
+        <span class="theme-icon theme-icon-sun" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></span>
+      </button>
+      <a class="btn btn-accent nav-cta" href="/#setup">Install</a>
+      <button class="icon-btn nav-menu" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-drawer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="nav-drawer" id="nav-drawer" hidden>
+    <a href="/#product">Product</a>
+    <a href="/docs/getting-started">Docs</a>
+    <a href="/#setup">Install</a>
+    <a href="https://github.com/LSUDOKO/Handoff" target="_blank" rel="noopener noreferrer">GitHub</a>
+  </div>
+</nav>
+<!-- nav:end -->
+
+<main>
+  <!-- ━━ Hero ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <section class="hero" id="product">
+    <div class="drift" aria-hidden="true"></div>
+
+    <div class="hero-orb fade-up" aria-label="The Handoff orb, cycling through its states">
+      <canvas id="orb" role="img" aria-label="An orb that changes colour as Handoff listens, thinks, speaks and acts"></canvas>
+      <div class="orb-fallback" hidden></div>
+    </div>
+    <p class="orb-caption fade-up d1" id="orb-caption" aria-live="polite">Tap to talk</p>
+
+    <h1 class="hero-title fade-up d1">Describe it. Hand it off. It runs.<span class="hero-line2">Hand off <span class="hero-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><span class="hero-roll" id="hero-roll">Gmail.</span></span></h1>
+
+    <p class="hero-sub fade-up d2">You describe a recurring chore in a sentence. It becomes a scheduled workflow on the Strands Agents SDK that runs unattended and stops to ask you only about the things it genuinely cannot judge. Your answer becomes a rule, so it asks less next time.</p>
+
+    <div class="hero-ctas fade-up d3">
+      <a class="btn btn-accent btn-lg" href="#setup">Install</a>
+      <a class="btn btn-glass btn-lg" id="watch-demo" data-video="" href="#" target="_blank" rel="noopener noreferrer">Watch the demo
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>
+      </a>
+    </div>
+
+    <div class="hero-pills fade-up d4">
+      <span class="pill"><span class="dot" aria-hidden="true"></span>Open source · Apache-2.0</span>
+      <span class="pill">Strands Agents SDK</span>
+      <span class="pill">Runs on Amazon Bedrock</span>
+      <a href="https://github.com/LSUDOKO/Handoff" target="_blank" rel="noopener noreferrer"><span class="pill">★ GitHub</span></a>
+    </div>
+  </section>
+
+  <!-- ━━ Set up in one command ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <section class="setup" id="setup">
+    <div class="wrap">
+      <div class="center reveal">
+        <h2 class="section-title">Set up in <span class="accent">one command.</span></h2>
+        <p class="section-lede">Python 3.12 and a terminal. The whole loop runs offline first — no keys, no account — then you add one key and it thinks for real.</p>
+      </div>
+      <div class="panel setup-card reveal">
+        <div class="setup-tabs" role="tablist" aria-label="How to install">
+          <button role="tab" data-tab="pip" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 7v10l8 4 8-4V7l-8-4zM4 7l8 4 8-4M12 11v10"/></svg>pip</button>
+          <button role="tab" data-tab="desktop" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>desktop</button>
+          <button role="tab" data-tab="docker" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="9" width="4" height="4"/><rect x="8" y="9" width="4" height="4"/><rect x="13" y="9" width="4" height="4"/><rect x="8" y="4" width="4" height="4"/><path d="M2 14h19c0 3-2 6-8 6H8c-4 0-6-3-6-6z"/></svg>Docker</button>
+          <button role="tab" data-tab="agentcore" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4 4 0 0 1-.5-8 6 6 0 0 1 11.6 1.5A3.5 3.5 0 0 1 17.5 18H7z"/></svg>AgentCore</button>
+        </div>
+
+        <div class="setup-pane" data-pane="pip">
+          <div class="setup-row">
+            <div class="head"><span class="num">01</span><div><h3>Clone and install</h3><p>The extras add the Groq provider, the native window and a credential-free web-fetch server.</p></div></div>
+            <div class="body">
+              <div class="cmd"><span class="prompt">$</span><code>git clone https://github.com/LSUDOKO/Handoff &amp;&amp; cd Handoff</code></div>
+              <div class="cmd"><span class="prompt">$</span><code>python3.12 -m venv .venv &amp;&amp; source .venv/bin/activate</code></div>
+              <div class="cmd"><span class="prompt">$</span><code>pip install -e ".[dev,groq,desktop,web]"</code></div>
+            </div>
+          </div>
+          <div class="setup-row">
+            <div class="head"><span class="num">02</span><div><h3>Configure and check</h3><p>The defaults run offline. Every line <code>doctor</code> prints is the result of a real call, with the fix beside any failure.</p></div></div>
+            <div class="body">
+              <div class="cmd"><span class="prompt">$</span><code>cp .env.example .env</code></div>
+              <div class="cmd"><span class="prompt">$</span><code>handoff doctor</code></div>
+            </div>
+          </div>
+          <div class="setup-row">
+            <div class="head"><span class="num">03</span><div><h3>Run it</h3><p>The demo is the whole loop on a scripted model: it works the inbox, asks about three items, and on the second run asks about none.</p></div></div>
+            <div class="body">
+              <div class="cmd"><span class="prompt">$</span><code>make demo</code></div>
+              <div class="cmd"><span class="prompt">$</span><code>handoff serve</code></div>
+              <p>Then open <span class="mono">http://localhost:8000</span>, press <strong>Run now</strong>, and watch the feed.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-pane" data-pane="desktop" hidden>
+          <div class="setup-row">
+            <div class="head"><span class="num">01</span><div><h3>Install with the desktop extra</h3><p>One Python environment, no Electron, no bundler.</p></div></div>
+            <div class="body"><div class="cmd"><span class="prompt">$</span><code>pip install -e ".[groq,desktop,web]"</code></div></div>
+          </div>
+          <div class="setup-row">
+            <div class="head"><span class="num">02</span><div><h3>Open the window</h3><p>WebKitGTK on Linux, WebKit on macOS, WebView2 on Windows. It remembers its size and its page, and opens on Talk once onboarding is done.</p></div></div>
+            <div class="body"><div class="cmd"><span class="prompt">$</span><code>handoff desktop</code></div></div>
+          </div>
+          <div class="setup-row">
+            <div class="head"><span class="num">03</span><div><h3>Talk to it</h3><p><span class="mono">Ctrl+Space</span> starts listening from any page. The voice extra records natively when the webview refuses the microphone.</p></div></div>
+            <div class="body"><div class="cmd"><span class="prompt">$</span><code>pip install -e ".[voice]"</code></div></div>
+          </div>
+        </div>
+
+        <div class="setup-pane" data-pane="docker" hidden>
+          <div class="setup-row">
+            <div class="head"><span class="num">01</span><div><h3>Build the image AgentCore runs</h3><p>AgentCore Runtime requires <span class="mono">linux/arm64</span>. On an x86 machine, install QEMU once.</p></div></div>
+            <div class="body">
+              <div class="cmd"><span class="prompt">$</span><code>docker run --privileged --rm tonistiigi/binfmt --install arm64</code></div>
+              <div class="cmd"><span class="prompt">$</span><code>make docker</code></div>
+            </div>
+          </div>
+          <div class="setup-row">
+            <div class="head"><span class="num">02</span><div><h3>Run it locally</h3><p>The container is the AgentCore Runtime entrypoint. It serves invocations on port 8080 and keeps its state in the container unless <span class="mono">USE_DYNAMODB</span> is on.</p></div></div>
+            <div class="body"><div class="cmd"><span class="prompt">$</span><code>docker run --rm -p 8080:8080 --env-file .env handoff:latest</code></div></div>
+          </div>
+          <div class="setup-row">
+            <div class="head"><span class="num">03</span><div><h3>Or push it</h3><p>Builds, pushes to ECR and launches the runtime through the control-plane API, then smoke-tests it.</p></div></div>
+            <div class="body"><div class="cmd"><span class="prompt">$</span><code>python infra/deploy_agentcore.py</code></div></div>
+          </div>
+        </div>
+
+        <div class="setup-pane" data-pane="agentcore" hidden>
+          <div class="setup-row">
+            <div class="head"><span class="num">01</span><div><h3>Preflight</h3><p>Names everything that is missing and stops. Set <span class="mono">USE_DYNAMODB=true</span> and <span class="mono">USE_AGENTCORE_MEMORY=true</span> in <span class="mono">.env</span> first — the runtime reads them at launch.</p></div></div>
+            <div class="body">
+              <div class="cmd"><span class="prompt">$</span><code>pip install -e ".[bedrock,agentcore]"</code></div>
+              <div class="cmd"><span class="prompt">$</span><code>python infra/deploy_agentcore.py --check</code></div>
+            </div>
+          </div>
+          <div class="setup-row">
+            <div class="head"><span class="num">02</span><div><h3>Storage, memory, runtime</h3><p>One DynamoDB table partitioned by collection; an AgentCore Memory store for learned rules; the runtime itself, waited on until READY.</p></div></div>
+            <div class="body">
+              <div class="cmd"><span class="prompt">$</span><code>python infra/dynamodb_setup.py</code></div>
+              <div class="cmd"><span class="prompt">$</span><code>python infra/memory_setup.py</code></div>
+              <div class="cmd"><span class="prompt">$</span><code>python infra/deploy_agentcore.py</code></div>
+            </div>
+          </div>
+          <div class="setup-row">
+            <div class="head"><span class="num">03</span><div><h3>Cron in the cloud</h3><p>EventBridge Scheduler cannot target AgentCore directly, so a twelve-line Lambda forwards each tick. One schedule per active cron workflow.</p></div></div>
+            <div class="body">
+              <div class="cmd"><span class="prompt">$</span><code>python infra/iam_setup.py</code></div>
+              <div class="cmd"><span class="prompt">$</span><code>python infra/lambda_setup.py --runtime-arn &lt;runtime-arn&gt;</code></div>
+              <div class="cmd"><span class="prompt">$</span><code>python infra/eventbridge_setup.py --target-arn &lt;lambda-arn&gt; --role-arn &lt;role-arn&gt;</code></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━ Handoff for … ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <section class="for" id="for">
+    <div class="for-sticky">
+      <div class="wrap for-grid">
+        <div class="for-left">
+          <h2 class="for-title">Handoff<br>for</h2>
+          <ul class="for-list">
+            <li class="on">
+              <button type="button"><span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg></span>inbox triage</button>
+              <div class="desc"><p>Every weekday at eight: real asks from teammates become Linear tickets, newsletters get archived, your manager gets a draft reply. It asks about the one email it cannot place — and the next morning, it doesn't.</p></div>
+            </li>
+            <li>
+              <button type="button"><span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="9" r="2.5"/><path d="M6 8.5v7M18 11.5c0 3-3 4-6 4H8.5"/></svg></span>PR review</button>
+              <div class="desc"><p>Open pull requests you were asked to review. Small, well-described ones from teammates get a first-pass comment drafted; anything touching auth, billing or migrations is flagged to you before a word is left.</p></div>
+            </li>
+            <li>
+              <button type="button"><span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17 9 11l4 4 8-8"/><path d="M15 7h6v6"/></svg></span>competitor watch</button>
+              <div class="desc"><p>Every Monday it reads the pricing page through a credential-free fetch server. Nothing moved, nothing said. Something moved, a summary lands in #competitive-intel — and it asks before posting anything that reads as a strategic call.</p></div>
+            </li>
+            <li>
+              <button type="button"><span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>meeting follow-up</button>
+              <div class="desc"><p>After a meeting ends: pull the commitments out of the notes, file yours as tickets, draft a short recap to attendees. Anything going to people outside the company waits for you.</p></div>
+            </li>
+            <li>
+              <button type="button"><span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>engineering ops</button>
+              <div class="desc"><p>Custom agents with allow-listed tools and skills, runnable from a workbench with a credential preflight. MCP servers you can probe and call live. A run inspector with every model turn, every tool call and its cost.</p></div>
+            </li>
+            <li>
+              <button type="button"><span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>anything on a schedule</button>
+              <div class="desc"><p>Describe the chore in a sentence. The trigger, the integrations and the line between what it may do alone and what it must ask about are written for you, as a config you can read and version.</p></div>
+            </li>
+          </ul>
+        </div>
+        <div class="for-shot" aria-hidden="true">
+          <img class="on" src="/screens/decision.png" alt="" loading="lazy">
+          <img src="/screens/run-inspector.png" alt="" loading="lazy">
+          <img src="/screens/tool-servers.png" alt="" loading="lazy">
+          <img src="/screens/chat.png" alt="" loading="lazy">
+          <img src="/screens/agent-workbench.png" alt="" loading="lazy">
+          <img src="/screens/overview.png" alt="" loading="lazy">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━ A decision. Not a notification. ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <section class="decision" id="decision">
+    <div class="wrap center">
+      <h2 class="section-title reveal">A <span class="accent">decision</span>. Not a notification.</h2>
+      <p class="section-lede reveal">Unsure items are set aside, not interrupted on. When the pass is done it asks about all of them at once: the item, why it stopped, how sure it was against the threshold, and the options. Answer on the screen, in chat, out loud, or from a terminal — the run picks up where it left off.</p>
+    </div>
+    <div class="strip-wrap">
+      <div class="strip">
+        <figure class="screen-frame"><img src="/screens/overview.png" alt="The workspace overview: latest runs, workflows, and what is waiting on you" loading="lazy"><figcaption>overview</figcaption></figure>
+        <figure class="screen-frame"><img src="/screens/activity.png" alt="Activity: pending decisions across workspaces, answerable inline" loading="lazy"><figcaption>activity</figcaption></figure>
+        <figure class="screen-frame"><img src="/screens/decision.png" alt="The decision screen: the item, the agent's reasoning, and the confidence gauge against the threshold" loading="lazy"><figcaption>decision</figcaption></figure>
+        <figure class="screen-frame"><img src="/screens/chat.png" alt="Chat: a persisted Strands session that operates the workspace and builds workflows" loading="lazy"><figcaption>chat</figcaption></figure>
+        <figure class="screen-frame"><img src="/screens/run-inspector.png" alt="The run inspector: a waterfall of every model turn and tool call, with cost" loading="lazy"><figcaption>inspector</figcaption></figure>
+        <figure class="screen-frame"><img src="/screens/agent-workbench.png" alt="The agent workbench: run any agent on a prompt, with result, tool calls and trace" loading="lazy"><figcaption>agents</figcaption></figure>
+        <figure class="screen-frame"><img src="/screens/tool-servers.png" alt="Tool servers: the MCP catalogue with a live tool invoker" loading="lazy"><figcaption>tool servers</figcaption></figure>
+        <figure class="screen-frame"><img src="/screens/overview-dark.png" alt="The workspace overview in the dark theme" loading="lazy"><figcaption>overview · dark</figcaption></figure>
+        <figure class="screen-frame"><img src="/screens/activity.png" alt="" loading="lazy"><figcaption>activity</figcaption></figure>
+        <figure class="screen-frame"><img src="/screens/decision.png" alt="" loading="lazy"><figcaption>decision</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━ Works with ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <section class="works" id="works">
+    <div class="wrap">
+      <p class="section-lede reveal">Works with the tools you already have, over MCP where one exists.</p>
+      <div class="keycap-rows reveal">
+        <div class="keycap-row">
+          <div class="keycap-wrap"><div class="keycap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18v12H3z"/><path d="m3 7 9 6 9-6"/></svg><span class="keycap-glare" aria-hidden="true"></span></div><span class="keycap-label">Gmail</span></div>
+          <div class="keycap-wrap"><div class="keycap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14 10 20M4 9l11 11M5 5l14 14M9 4l11 11M14 4l6 6"/></svg><span class="keycap-glare" aria-hidden="true"></span></div><span class="keycap-label">Linear</span></div>
+          <div class="keycap-wrap"><div class="keycap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v16M15 4v16M4 9h16M4 15h16"/></svg><span class="keycap-glare" aria-hidden="true"></span></div><span class="keycap-label">Slack</span></div>
+          <div class="keycap-wrap"><div class="keycap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2.5"/><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 7.5v9M18 10.5c0 3.5-3 4.5-6 4.5H9"/></svg><span class="keycap-glare" aria-hidden="true"></span></div><span class="keycap-label">GitHub</span></div>
+        </div>
+        <div class="keycap-row">
+          <div class="keycap-wrap"><div class="keycap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8c4-2 12-2 16 0M4 12c4-2 12-2 16 0M4 16c4-2 12-2 16 0"/></svg><span class="keycap-glare" aria-hidden="true"></span></div><span class="keycap-label">Amazon Bedrock</span></div>
+          <div class="keycap-wrap"><div class="keycap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg><span class="keycap-glare" aria-hidden="true"></span></div><span class="keycap-label">AgentCore</span></div>
+          <div class="keycap-wrap"><div class="keycap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8c3 0 3 8 6 8s3-8 6-8 3 8 6 8"/><path d="M3 16c3 0 3-8 6-8s3 8 6 8 3-8 6-8"/></svg><span class="keycap-glare" aria-hidden="true"></span></div><span class="keycap-label">Strands</span></div>
+          <div class="keycap-wrap"><div class="keycap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3v5M15 3v5M7 8h10v3a5 5 0 0 1-10 0V8zM12 16v5"/></svg><span class="keycap-glare" aria-hidden="true"></span></div><span class="keycap-label">MCP</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━ Final CTA ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <section class="cta reveal">
+    <h2>Hand it <span class="accent">off.</span></h2>
+    <p class="section-lede">One sentence, one schedule, one screen when it needs you. Runs on your machine, in a desktop window, or on Amazon Bedrock AgentCore. Open source under Apache-2.0.</p>
+    <div class="cta-row">
+      <a class="btn btn-accent" href="#setup">Install</a>
+      <a class="btn btn-glass" href="/docs/getting-started">Read the docs</a>
+    </div>
+  </section>
+</main>
+</div>
+
+<!-- footer:start -->
+<footer class="site-footer">
+  <div class="wrap footer-top">
+    <div class="footer-links">
+      <a class="social" href="https://github.com/LSUDOKO/Handoff" target="_blank" rel="noopener noreferrer" aria-label="Handoff on GitHub">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2.5"/><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 7.5v9M18 10.5c0 3.5-3 4.5-6 4.5H9"/></svg>
+      </a>
+      <a href="/#product">Product</a>
+      <a href="/docs/getting-started">Docs</a>
+      <a href="/docs/talk">Talk</a>
+      <a href="/docs/cli">CLI</a>
+    </div>
+    <div class="footer-links">
+      <a href="/docs/deploy">Deploy</a>
+      <a href="/docs/architecture">Architecture</a>
+      <a href="https://strandsagents.com" target="_blank" rel="noopener noreferrer">Strands Agents SDK</a>
+      <a href="https://github.com/LSUDOKO/Handoff/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">License</a>
+    </div>
+  </div>
+  <div class="wrap"><p class="footer-note">© 2026 The Handoff Authors. Open source under Apache-2.0. Built on the Strands Agents SDK.</p></div>
+  <div class="wordmark-clip" aria-hidden="true"><div class="wordmark-giant">handoff</div></div>
+</footer>
+<!-- footer:end -->
+
+<script src="/assets/orb.js"></script>
+<script src="/assets/site.js"></script>
+</body>
+</html>

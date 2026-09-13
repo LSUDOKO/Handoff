@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{title}} — Handoff docs</title>
+<meta name="description" content="{{description}}">
+<meta property="og:title" content="{{title}} — Handoff docs">
+<meta property="og:description" content="{{description}}">
+<meta property="og:type" content="article">
+<meta property="og:image" content="/screens/overview.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='8' fill='%23e8dcc4'/%3E%3Crect x='9' y='9' width='10' height='10' rx='2' fill='%23433a2f' transform='rotate(45 14 14)'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Comfortaa:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/assets/site.css">
+<script>(function(){try{var t=localStorage.getItem("handoff-theme");if(t==="dark"||t==="light"){document.documentElement.dataset.theme=t;}}catch(e){}})();</script>
+</head>
+<body>
+<div class="page-sheet">
+{{sitenav}}
+<main class="wrap doc-layout">
+  <nav class="doc-nav" aria-label="Documentation">
+    <p class="doc-nav-title">Docs</p>
+    <ol>
+{{nav}}
+    </ol>
+  </nav>
+  <article class="doc-content">
+{{content}}
+    <nav class="doc-pager" aria-label="Previous and next">
+{{pager}}
+    </nav>
+  </article>
+  <nav class="doc-outline" aria-label="On this page">
+    <p class="outline-title">On this page</p>
+    <ol>
+{{outline}}
+    </ol>
+  </nav>
+</main>
+</div>
+{{footer}}
+<script src="/assets/site.js"></script>
+</body>
+</html>
