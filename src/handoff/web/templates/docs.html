@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% import "_page.html" as ui %}
+{% block title %}{{ doc.title }} — Handoff docs{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/docs.css">{% endblock %}
+{% block body %}
+<div class="page">
+  {{ ui.title(doc.title, doc.summary or "How Handoff works and how to run it.", [{"label": "Docs", "href": "/docs"}]) }}
+  <div class="doc-layout">
+    <nav class="doc-nav" aria-label="Documentation">
+      <ol>
+        {% for d in guides %}
+        <li><a href="/docs/{{ d.slug }}" {% if d.slug == doc.slug %}aria-current="page"{% endif %}>{{ d.title }}</a></li>
+        {% endfor %}
+      </ol>
+      <p class="doc-nav-foot"><a href="https://github.com/LSUDOKO/Handoff" target="_blank" rel="noopener">Source on GitHub</a></p>
+    </nav>
+    <article class="doc-content prose">
+      {{ doc.html|safe }}
+      <nav class="doc-pager" aria-label="Previous and next">
+        {% if prev %}<a class="button secondary small" href="/docs/{{ prev.slug }}">← {{ prev.title }}</a>{% else %}<span></span>{% endif %}
+        {% if next %}<a class="button secondary small" href="/docs/{{ next.slug }}">{{ next.title }} →</a>{% endif %}
+      </nav>
+    </article>
+    <nav class="doc-outline" aria-label="On this page">
+      <p class="outline-title">On this page</p>
+      <ol>
+        {% for h in doc.outline %}<li class="depth-{{ h.depth }}"><a href="#{{ h.id }}">{{ h.text }}</a></li>{% endfor %}
+      </ol>
+    </nav>
+  </div>
+</div>
+<script>
+(() => {
+  const links = [...document.querySelectorAll(".doc-outline a")];
+  const heads = links.map((a) => document.getElementById(decodeURIComponent(a.getAttribute("href").slice(1)))).filter(Boolean);
+  if (!heads.length) return;
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting) { links.forEach((a) => a.classList.toggle("active", a.getAttribute("href") === "#" + e.target.id)); }
+  }, { root: document.querySelector(".app-content"), rootMargin: "-8% 0px -70% 0px" });
+  heads.forEach((h) => io.observe(h));
+  document.querySelectorAll(".doc-content pre").forEach((pre) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "copy"; b.textContent = "Copy";
+    b.addEventListener("click", () => { navigator.clipboard.writeText(pre.innerText); b.textContent = "Copied"; setTimeout(() => (b.textContent = "Copy"), 1600); });
+    pre.append(b);
+  });
+})();
+</script>
+{% endblock %}

@@ -72,7 +72,14 @@ from handoff.web import nav  # noqa: E402
 
 config.configure_observability()
 
-app = FastAPI(title="Handoff", description="Describe it. Hand it off. It runs.")
+# The interactive API reference moves aside so /docs can be the guides.
+app = FastAPI(
+    title="Handoff",
+    description="Describe it. Hand it off. It runs.",
+    docs_url="/api/docs",
+    redoc_url=None,
+    openapi_url="/api/openapi.json",
+)
 app.mount("/static", StaticFiles(directory=UI_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(UI_DIR / "templates"))
 
@@ -802,6 +809,35 @@ def live_panel(request: Request, run_id: str):
         request=request,
         name="_live.html",
         context={"run_id": run_id, "history": events.history(run_id)},
+    )
+
+
+# --- docs ------------------------------------------------------------------------
+
+
+@app.get("/docs")
+def docs_index():
+    from handoff import docs
+
+    return RedirectResponse(f"/docs/{docs.ORDER[0]}", status_code=303)
+
+
+@app.get("/docs/{slug}", response_class=HTMLResponse)
+def docs_page(request: Request, slug: str):
+    """The guides, from the same markdown the public site is built from."""
+    from handoff import docs
+
+    guides = docs.index()
+    if slug not in [g["slug"] for g in guides]:
+        raise HTTPException(404, "No such guide")
+    doc = docs.render(slug)
+    position = docs.ORDER.index(slug)
+    prev_guide = guides[position - 1] if position > 0 else None
+    next_guide = guides[position + 1] if position + 1 < len(guides) else None
+    return templates.TemplateResponse(
+        request=request,
+        name="docs.html",
+        context=_context(request, "docs", doc=doc, guides=guides, prev=prev_guide, next=next_guide),
     )
 
 
