@@ -127,6 +127,7 @@ def build_workflow_graph(
     gate: HITLGate | None = None,
     extra_tools: list[Any] | None = None,
     recorder: Any = None,
+    run_channel: str = "",
 ):
     """Wire trigger → executor → completer into a Strands Graph.
 
@@ -143,6 +144,9 @@ def build_workflow_graph(
             rather than its own copy of every credential.
         recorder: A ``SessionRecorder``. Bound to every node, so the step
             trace covers the whole graph rather than just the executor.
+        run_channel: Events channel (the run id) to narrate on. Every node
+            then reports its start, its end and each tool call live, which
+            is what the orb draws the graph from.
 
     Returns:
         A built ``Graph``, ready to invoke.
@@ -181,6 +185,13 @@ def build_workflow_graph(
         recorder.bind(trigger_agent, "trigger")
         recorder.bind(executor_agent, "executor")
         recorder.bind(completer_agent, "completer")
+    if run_channel:
+        from handoff.graph.hooks.narrator import bind_graph_narrator
+
+        bind_graph_narrator(
+            run_channel,
+            {"trigger": trigger_agent, "executor": executor_agent, "completer": completer_agent},
+        )
 
     builder = GraphBuilder()
     builder.add_node(trigger_agent, "trigger")

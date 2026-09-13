@@ -144,7 +144,9 @@ class WorkflowRunner:
 
         gate = self._make_gate(run)
         recorder = self._make_recorder(run)
-        graph = build_workflow_graph(self.workflow, self.model, gate, recorder=recorder)
+        graph = build_workflow_graph(
+            self.workflow, self.model, gate, recorder=recorder, run_channel=run.run_id
+        )
         ctx = RunContext(
             run_id=run.run_id, workflow_id=self.workflow.workflow_id, workflow=self.workflow
         )
@@ -177,7 +179,9 @@ class WorkflowRunner:
 
         gate = self._make_gate(run)
         recorder = self._make_recorder(run)
-        graph = build_workflow_graph(self.workflow, self.model, gate, recorder=recorder)
+        graph = build_workflow_graph(
+            self.workflow, self.model, gate, recorder=recorder, run_channel=run.run_id
+        )
         graph.deserialize_state(run.graph_state)
 
         ctx = RunContext(

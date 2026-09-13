@@ -18,13 +18,13 @@ from datetime import UTC, datetime
 from typing import Any
 
 from strands import Agent
-from strands.hooks import AfterToolCallEvent, BeforeToolCallEvent, HookProvider, HookRegistry
 from strands.session.repository_session_manager import RepositorySessionManager
 
 from handoff import config, events
 from handoff.agents.builder import BUILDER_PROMPT, extract_config
 from handoff.chat import tools as chat_tools
 from handoff.chat.repository import StoreSessionRepository
+from handoff.graph.hooks.narrator import Narrator
 from handoff.memory.store import recall_preferences, store_user_preference
 from handoff.platform.artifacts import create_artifact
 from handoff.platform.models import Chat, UsageRecord
@@ -69,70 +69,6 @@ def _without_config(text: str) -> str:
 
 def _channel(chat_id: str) -> str:
     return f"chat:{chat_id}"
-
-
-class Narrator(HookProvider):
-    """Emits a tool_start / tool_end pair for every tool call in a turn."""
-
-    def __init__(self, channel: str, turn: int) -> None:
-        self.channel = channel
-        self.turn = turn
-        self.steps: list[dict[str, Any]] = []
-        self._started: dict[str, float] = {}
-
-    def register_hooks(self, registry: HookRegistry, **kwargs: Any) -> None:
-        registry.add_callback(BeforeToolCallEvent, self._before)
-        registry.add_callback(AfterToolCallEvent, self._after)
-
-    def _before(self, event: BeforeToolCallEvent) -> None:
-        use = event.tool_use or {}
-        tool_id = str(use.get("toolUseId", ""))
-        self._started[tool_id] = time.monotonic()
-        events.emit(
-            self.channel,
-            "tool_start",
-            f"calling {use.get('name')}",
-            turn=self.turn,
-            tool_id=tool_id,
-            name=use.get("name", "tool"),
-            input=use.get("input", {}),
-        )
-
-    def _after(self, event: AfterToolCallEvent) -> None:
-        use = event.tool_use or {}
-        tool_id = str(use.get("toolUseId", ""))
-        ms = int((time.monotonic() - self._started.pop(tool_id, time.monotonic())) * 1000)
-        result = event.result or {}
-        status = "error" if getattr(event, "exception", None) or result.get("status") == "error" else "ok"
-        if getattr(event, "cancel_message", None):
-            status = "cancelled"
-        text = ""
-        for block in result.get("content", []) or []:
-            if isinstance(block, dict):
-                if "text" in block:
-                    text += block["text"]
-                elif "json" in block:
-                    text += json.dumps(block["json"], indent=2, default=str)
-        step = {
-            "tool_id": tool_id,
-            "name": use.get("name", "tool"),
-            "input": use.get("input", {}),
-            "output": text[:4000],
-            "status": status,
-            "ms": ms,
-        }
-        self.steps.append(step)
-        events.emit(
-            self.channel,
-            "tool_end",
-            f"{use.get('name')} {status}",
-            turn=self.turn,
-            tool_id=tool_id,
-            name=step["name"],
-            output=step["output"],
-            status=status,
-            ms=ms,
-        )
 
 
 def _ready_mcp_tools() -> list[Any]:
