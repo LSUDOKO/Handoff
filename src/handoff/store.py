@@ -148,6 +148,13 @@ class DynamoCollection:
     makes listing a Query, so that cannot happen.
     """
 
+    #: How long a listing may be reused. A page makes dozens of ``all()``
+    #: calls on the same few collections — stats, pending, latest run, per
+    #: workflow — and each is a round trip to the region. Three seconds is
+    #: long enough to serve one page from one Query per collection and short
+    #: enough that a change made in another process shows on the next click.
+    TTL_SECONDS = 3.0
+
     def __init__(
         self, table_name: str, model: type[T], key_field: str, collection: str
     ) -> None:
@@ -159,6 +166,10 @@ class DynamoCollection:
         self._table = boto3.resource(
             "dynamodb", region_name=config.AWS_REGION
         ).Table(table_name)
+        self._cache: tuple[float, list[T]] | None = None
+
+    def _invalidate(self) -> None:
+        self._cache = None
 
     def _key(self, key: str) -> dict[str, str]:
         return {"pk": self.collection, "sk": str(key)}
@@ -175,7 +186,12 @@ class DynamoCollection:
         )
 
     def all(self) -> list[T]:
+        import time
+
         from boto3.dynamodb.conditions import Key
+
+        if self._cache is not None and time.monotonic() - self._cache[0] < self.TTL_SECONDS:
+            return list(self._cache[1])
 
         items: list[dict] = []
         kwargs: dict = {"KeyConditionExpression": Key("pk").eq(self.collection)}
@@ -188,7 +204,9 @@ class DynamoCollection:
             # Paginate. A run's audit trail outgrows one page long before
             # anyone notices the list has quietly stopped at 1MB.
             kwargs["ExclusiveStartKey"] = start
-        return [self._load(item) for item in items]
+        loaded = [self._load(item) for item in items]
+        self._cache = (time.monotonic(), loaded)
+        return list(loaded)
 
     def get(self, key_field: str, key: str) -> T | None:
         item = self._table.get_item(Key=self._key(key)).get("Item")
@@ -197,6 +215,7 @@ class DynamoCollection:
     def put(self, item: T, key_field: str) -> T:
         payload = self._clean(json.loads(item.model_dump_json()))
         self._table.put_item(Item={**payload, **self._key(payload[key_field])})
+        self._invalidate()
         return item
 
     def append(self, item: T) -> T:
@@ -204,6 +223,7 @@ class DynamoCollection:
 
     def delete(self, key_field: str, key: str) -> bool:
         self._table.delete_item(Key=self._key(key))
+        self._invalidate()
         return True
 
     def clear(self) -> None:  # pragma: no cover - never called against AWS
