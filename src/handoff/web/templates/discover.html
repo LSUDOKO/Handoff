@@ -4,17 +4,41 @@
 {% block body %}
 <div class="page">
   {{ ui.title("Discover", "Complete setups you can import and then edit. Better than a blank page.") }}
-  <div class="page-body">
-    <div class="grid auto">
+  <div class="list-detail">
+    <nav class="ld-list">
+      <input class="input ld-search" type="search" placeholder="Search templates…" oninput="const q=this.value.toLowerCase(); this.parentElement.querySelectorAll('.ld-item').forEach(a=>{a.hidden = q && !a.textContent.toLowerCase().includes(q)})">
+      <div class="ld-group">Templates</div>
       {% for t in templates %}
-      <div class="card">
-        <div class="row"><span class="provider-mark" style="font-size: var(--font-size-4)">{{ t.icon }}</span><span class="section-title grow">{{ t.name }}</span>{% if t.installed %}{{ ui.status('ok', 'imported') }}{% endif %}</div>
-        <p class="text-bright text-sm">{{ t.tagline }}</p>
-        <p class="text-faded text-xs" style="line-height: var(--lh-3)">{{ t.description }}</p>
-        <div class="row" style="margin-block-start: auto"><span class="tool-list">{% for i in t.integrations %}<span class="pill">{{ i }}</span>{% endfor %}</span>
-          {% if not t.installed %}<button class="button accent small ml-auto" hx-post="/discover/{{ t.slug }}/install" hx-target="body" hx-swap="outerHTML">Import</button>{% endif %}</div>
-      </div>
+      <a class="ld-item" href="/discover/{{ t.slug }}" {% if selected and t.slug == selected.slug %}aria-current="true"{% endif %}><span class="provider-mark" style="inline-size:20px;block-size:20px;font-size:12px">{{ t.icon }}</span><span class="name">{{ t.name }}</span>{% if t.installed %}<span class="sub">imported</span>{% endif %}</a>
       {% endfor %}
+    </nav>
+    <div class="ld-detail">
+      {% if not selected %}{{ ui.empty("Pick a template", "Each one is a working setup: workflows, the skills that encode its judgement, and the integrations it expects.") }}
+      {% else %}
+      {% set t = selected %}
+      <div class="stack" style="gap: var(--size-6); max-inline-size: 820px">
+        <div class="row" style="align-items: flex-start">
+          <span class="provider-mark" style="inline-size:40px;block-size:40px;font-size:20px;border-radius:10px">{{ t.icon }}</span>
+          <div class="stack grow" style="gap: var(--size-1)"><h2 class="text-2xl text-bright" style="font-weight:600">{{ t.name }}</h2><p class="text-faded">{{ t.tagline }}</p></div>
+          {% if t.installed %}{{ ui.status('ok','imported') }}{% endif %}
+        </div>
+        <div class="readme"><p>{{ t.description }}</p>
+          <h2>What you get</h2>
+          <ul>{% for w in t.workflow_details %}<li><b>{{ w.name }}</b> — {{ w.description }} <span class="text-faded">({{ w.schedule }})</span></li>{% endfor %}</ul>
+          {% if t.skills %}<h2>Skills it relies on</h2><ul>{% for s in t.skills %}<li><code>{{ s }}</code></li>{% endfor %}</ul>{% endif %}
+          <h2>Integrations</h2><p>{% for i in t.integrations %}<span class="pill">{{ i }}</span> {% endfor %}</p>
+        </div>
+        <div class="card">
+          <header class="section-head"><h2 class="section-title">Add to a workspace</h2></header>
+          <form class="row" method="post" action="/discover/{{ t.slug }}/install" style="flex-wrap: wrap; align-items: flex-end">
+            <label class="field" style="inline-size: 16rem"><span>Workspace</span><select class="input" name="workspace_id"><option value="">New workspace: {{ t.name }}</option>{% for w in workspaces %}<option value="{{ w.workspace_id }}" {% if w.workspace_id == workspace.workspace_id %}selected{% endif %}>{{ w.name }}</option>{% endfor %}</select></label>
+            <button class="button accent" type="submit">{{ ui.icon('i-download','sm') }} {{ 'Import again' if t.installed else 'Import' }}</button>
+            <span class="text-faded text-xs">Importing twice never duplicates anything.</span>
+          </form>
+        </div>
+        <dl class="manifest"><dt>slug</dt><dd class="mono">{{ t.slug }}</dd><dt>workflows</dt><dd class="mono">{{ t.workflows|join(', ') }}</dd></dl>
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>

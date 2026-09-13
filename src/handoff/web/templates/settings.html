@@ -8,14 +8,25 @@
     <div class="stack" style="gap: var(--size-8)">
       {% if flash %}<div class="callout {{ 'error' if flash_kind == 'error' else '' }}">{{ flash }}</div>{% endif %}
 
-      <section class="card">
+      <section class="card" id="models">
         <header class="section-head"><h2 class="section-title">Models</h2><span class="section-count">primary → fallback</span></header>
         <div class="model-chain">
-          <span class="model-slot"><span class="prov provider-mark" style="inline-size:18px;block-size:18px;font-size:10px">{{ settings.provider[:1]|upper }}</span><span class="role">primary</span>{{ settings.model_id }}</span>
+          <span class="model-slot"><span class="provider-mark" style="inline-size:18px;block-size:18px;font-size:10px">{{ models.providers[models.provider].letter if models.provider in models.providers else 'F' }}</span><span class="role">primary</span>{{ models.primary }}</span>
           <span class="chain-arrow">→</span>
-          <span class="model-slot fallback"><span class="role">fallback</span>{{ settings.fallback_model_id }}</span>
+          <span class="model-slot fallback"><span class="role">fallback</span>{{ models.fallback or '—' }}</span>
         </div>
-        <p class="text-faded text-xs">Provider and model ids come from <code class="mono">.env</code> (<code class="mono">HANDOFF_MODEL_PROVIDER</code>, <code class="mono">BEDROCK_MODEL_ID</code>, …). Connect a key on <a class="text-bright" href="/credentials">Credentials</a>; Bedrock ids resolve to the right regional inference profile automatically.</p>
+        <form class="stack" hx-post="/settings/models" hx-target="body" hx-swap="outerHTML" style="margin-block-start: var(--size-2)">
+          <div class="field-row">
+            <label class="field"><span>Provider</span><select class="input" name="provider" id="provider-select" onchange="document.querySelectorAll('[data-provider]').forEach(el=>el.hidden = el.dataset.provider !== this.value)">
+              {% for key, meta in models.providers.items() %}<option value="{{ key }}" {% if key == models.provider %}selected{% endif %}>{{ meta.name }}</option>{% endfor %}</select>
+              <span class="help">Bedrock uses your AWS credentials; Groq and Anthropic need a key on <a class="text-bright" href="/credentials">Credentials</a>. Changing provider needs a restart.</span></label>
+            {% for key, options in models.catalog.items() %}
+            <label class="field" data-provider="{{ key }}" {% if key != models.provider %}hidden{% endif %}><span>Primary</span><select class="input" name="primary_{{ key }}">{% for m in options %}<option value="{{ m.id }}" {% if m.id == models.primary or ('.' ~ m.id) in models.primary %}selected{% endif %}>{{ m.name }} — {{ m.note }}</option>{% endfor %}</select></label>
+            <label class="field" data-provider="{{ key }}" {% if key != models.provider %}hidden{% endif %}><span>Fallback</span><select class="input" name="fallback_{{ key }}"><option value="">none</option>{% for m in options %}<option value="{{ m.id }}" {% if m.id == models.fallback or ('.' ~ m.id) in models.fallback %}selected{% endif %}>{{ m.name }} — {{ m.note }}</option>{% endfor %}</select></label>
+            {% endfor %}
+          </div>
+          <div class="form-actions"><button class="button accent" type="submit">Save models</button><span class="text-faded text-xs">Written to <code class="mono">{{ models.env_file }}</code>.</span></div>
+        </form>
       </section>
 
       <section class="card">

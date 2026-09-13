@@ -3,28 +3,38 @@
 {% block title %}Usage — Handoff{% endblock %}
 {% block body %}
 <div class="page">
-  {{ ui.title("Usage", "What the agents cost. List prices — enough to tell $2 a month from $200.") }}
+  {% call ui.title("Usage", "What the agents cost. List prices — enough to tell $2 a month from $200.") %}
+    <form class="row" method="get" action="/usage">
+      <select class="input" name="workspace" onchange="this.form.submit()" style="min-block-size: var(--size-6-5); inline-size: auto"><option value="">All workspaces</option>{% for w in workspaces %}<option value="{{ w.workspace_id }}" {% if w.workspace_id == filter_ws %}selected{% endif %}>{{ w.name }}</option>{% endfor %}</select>
+      <select class="input" name="model" onchange="this.form.submit()" style="min-block-size: var(--size-6-5); inline-size: auto"><option value="">All models</option>{% for m in all_models %}<option value="{{ m }}" {% if m == filter_model %}selected{% endif %}>{{ m }}</option>{% endfor %}</select>
+    </form>
+  {% endcall %}
   <div class="page-body">
     <div class="stack" style="gap: var(--size-8)">
       <section class="stat-strip">
         <div class="stat"><span class="v">{{ '{:,}'.format(usage.total_tokens) }}</span><span class="k">tokens</span></div>
         <div class="stat"><span class="v">{{ usage.total_calls }}</span><span class="k">model calls</span></div>
-        <div class="stat"><span class="v">{{ usage.runs }}</span><span class="k">runs</span></div>
+        <div class="stat"><span class="v">{{ usage.runs }}</span><span class="k">runs & chats</span></div>
         <div class="stat"><span class="v">{{ '{:,}'.format(usage.per_run_tokens) }}</span><span class="k">tokens per run</span></div>
         <div class="stat"><span class="v {{ 'done' if usage.total_cost == 0 else '' }}">${{ '%.3f'|format(usage.total_cost) }}</span><span class="k">estimated</span></div>
       </section>
-      {% if usage.models %}
-      <div class="table-wrap"><table class="table">
-        <thead><tr><th>Model</th><th class="num">Calls</th><th class="num">Input</th><th class="num">Output</th><th class="num">Cost</th></tr></thead>
-        <tbody>
-          {% for m in usage.models %}
-          <tr><td><b class="text-bright mono">{{ m.model }}</b>{% if m.free %} <span class="pill">free tier</span>{% endif %}<div class="usage-bar"><i style="width: {{ m.share }}%"></i></div></td>
-            <td class="num">{{ m.calls }}</td><td class="num">{{ '{:,}'.format(m.input) }}</td><td class="num">{{ '{:,}'.format(m.output) }}</td><td class="num">{% if m.free %}—{% else %}${{ '%.4f'|format(m.cost) }}{% endif %}</td></tr>
-          {% endfor %}
-        </tbody>
-      </table></div>
-      {% else %}
-      {{ ui.empty("No usage recorded yet", "Every model call a run makes is counted here, attributed to the model that served it.") }}
+      <section class="stack">
+        <div class="section-head"><h2 class="section-title">By model</h2></div>
+        {% if usage.models %}
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th>Model</th><th class="num">Calls</th><th class="num">Input</th><th class="num">Output</th><th class="num">Cost</th></tr></thead>
+          <tbody>{% for m in usage.models %}<tr><td><b class="text-bright mono">{{ m.model }}</b>{% if m.free %} <span class="pill">free tier</span>{% elif not m.priced %} <span class="pill">pricing unavailable</span>{% endif %}<div class="usage-bar"><i style="width: {{ m.share }}%"></i></div></td><td class="num">{{ m.calls }}</td><td class="num">{{ '{:,}'.format(m.input) }}</td><td class="num">{{ '{:,}'.format(m.output) }}</td><td class="num">{% if m.free %}—{% else %}${{ '%.4f'|format(m.cost) }}{% endif %}</td></tr>{% endfor %}</tbody>
+        </table></div>
+        {% else %}{{ ui.empty("No usage recorded yet", "Every model call a run or chat makes is counted here, attributed to the model that served it.") }}{% endif %}
+      </section>
+      {% if per_run %}
+      <section class="stack">
+        <div class="section-head"><h2 class="section-title">By run</h2><span class="section-count">newest first</span></div>
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th>Run</th><th>Kind</th><th>Model</th><th class="num">Calls</th><th class="num">Tokens</th><th class="num">Cost</th><th>When</th></tr></thead>
+          <tbody>{% for r in per_run %}<tr><td><a class="text-bright mono" href="{{ r.href }}">{{ r.label }}</a></td><td class="text-faded">{{ r.kind }}</td><td class="mono text-faded">{{ r.model }}</td><td class="num">{{ r.calls }}</td><td class="num">{{ '{:,}'.format(r.tokens) }}</td><td class="num">${{ '%.4f'|format(r.cost) }}</td><td class="text-faded">{{ ui.ago(r.at) }}</td></tr>{% endfor %}</tbody>
+        </table></div>
+      </section>
       {% endif %}
     </div>
   </div>

@@ -59,14 +59,62 @@ def save_from_markdown(
     skill = store.skills.get("skill_id", skill_id) if skill_id else None
     if skill is None:
         skill = Skill(workspace_id=workspace_id, namespace=namespace, name=name)
+    from datetime import UTC, datetime
+
+    if skill.body and (skill.body != body or skill.description != description):
+        # Keep the last five versions. Enough to undo a bad edit; not a VCS.
+        skill.history = [
+            {"description": skill.description, "body": skill.body, "at": skill.updated_at.isoformat()},
+            *skill.history,
+        ][:5]
     skill.name = slugify(name, "skill")
     skill.description = description
     skill.body = body
-    from datetime import UTC, datetime
-
     skill.updated_at = datetime.now(UTC)
     store.skills.put(skill, "skill_id")
     return skill
+
+
+def diff_with_previous(skill: Skill, version: int = 0) -> str:
+    """A unified diff from a previous version to the current text."""
+    import difflib
+
+    if not skill.history or version >= len(skill.history):
+        return ""
+    old = skill.history[version]
+    before = f"description: {old.get('description', '')}\n\n{old.get('body', '')}".splitlines()
+    after = f"description: {skill.description}\n\n{skill.body}".splitlines()
+    return "\n".join(
+        difflib.unified_diff(before, after, fromfile=f"{skill.name} @ {old.get('at', '')[:19]}", tofile=f"{skill.name} (current)", lineterm="")
+    )
+
+
+def import_files(files: list[tuple[str, bytes]], workspace_id: str = "") -> list[Skill]:
+    """Import skills from uploaded Markdown files or a zip of them."""
+    import io
+    import zipfile
+
+    docs: list[tuple[str, str]] = []
+    for filename, data in files:
+        if filename.lower().endswith(".zip") or data[:2] == b"PK":
+            with zipfile.ZipFile(io.BytesIO(data)) as zf:
+                for name in zf.namelist():
+                    if name.lower().endswith(".md"):
+                        docs.append((name, zf.read(name).decode("utf-8", "replace")))
+        elif filename.lower().endswith((".md", ".markdown", ".txt")):
+            docs.append((filename, data.decode("utf-8", "replace")))
+    saved: list[Skill] = []
+    for name, text in docs:
+        if not text.strip():
+            continue
+        # A SKILL.md inside a folder is named by the folder, as the convention goes.
+        parsed_name, _, _ = parse(text)
+        if parsed_name == "skill":
+            folder = name.rsplit("/", 2)
+            hint = folder[-2] if len(folder) >= 2 and folder[-1].upper() == "SKILL.MD" else name.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+            text = f"---\nname: {hint}\ndescription: Imported from {name}\n---\n\n{text.strip()}"
+        saved.append(save_from_markdown(text, workspace_id=workspace_id, namespace="imported"))
+    return saved
 
 
 def compose(skill_ids: list[str], workspace_id: str | None = None) -> str:

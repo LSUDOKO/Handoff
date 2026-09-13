@@ -3,34 +3,52 @@
 {% block title %}Tool servers — Handoff{% endblock %}
 {% block body %}
 <div class="page">
-  {% call ui.title("Tool servers", "Where the agent's tools come from. MCP servers, local or remote.") %}
+  {% call ui.title("Tool servers", "Where the agent's tools come from. MCP servers, local or remote — inspect them, call a tool, see who uses it.") %}
+    <button class="button secondary small" data-dialog="#registry">{{ ui.icon('i-download','sm') }} From registry</button>
     <button class="button primary small" data-dialog="#add-server">{{ ui.icon('i-plus','sm') }} Add server</button>
   {% endcall %}
-  <div class="page-body">
-    <div class="rows">
+  <div class="list-detail">
+    <nav class="ld-list">
+      <div class="ld-group">Installed</div>
       {% for s in servers %}
-      <div class="row-item" id="srv-{{ s.server_id }}" style="flex-wrap: wrap">
-        <span class="provider-mark">{{ ui.icon('i-wrench','sm') }}</span>
-        <div class="stack grow" style="gap: 2px; min-inline-size: 240px">
-          <span class="row"><span class="primary">{{ s.name }}</span>
-            {% if s.builtin %}<span class="pill">built-in</span>{% endif %}
-            {% if not s.enabled %}{{ ui.status('disabled') }}{% elif s.ready %}{{ ui.status('ok','ready') }}{% else %}{{ ui.status('error','needs credentials') }}{% endif %}</span>
-          <span class="secondary">{{ s.description }}{% if s.last_error %} <b style="color: var(--red)">{{ s.last_error }}</b>{% endif %}</span>
-          <span class="meta mono">{{ s.transport }}{% if s.command %} · {{ s.command }} {{ s.args|join(' ') }}{% endif %}{% if s.url %} · {{ s.url }}{% endif %}{% if s.required_env %} · needs {{ s.required_env|join(', ') }}{% endif %}</span>
-          {% if s.tool_names %}<span class="tool-list">{% for t in s.tool_names %}<span class="pill mono">{{ t }}</span>{% endfor %}</span>{% endif %}
-        </div>
-        <span class="controls">
-          <button class="button secondary small" hx-post="/mcp/{{ s.server_id }}/probe" hx-target="body" hx-swap="outerHTML">Probe</button>
-          <button class="button secondary small" hx-post="/mcp/{{ s.server_id }}/toggle" hx-target="body" hx-swap="outerHTML">{{ 'Disable' if s.enabled else 'Enable' }}</button>
-          {% if not s.builtin %}<button class="button destructive small" hx-post="/mcp/{{ s.server_id }}/delete" hx-target="body" hx-swap="outerHTML" hx-confirm="Remove {{ s.name }}?">Remove</button>{% endif %}
-        </span>
+      <a class="ld-item" href="/mcp/{{ s.server_id }}" {% if selected and s.server_id == selected.server_id %}aria-current="true"{% endif %}>
+        <span class="ws-dot" data-color="{{ 'green' if (s.enabled and s.ready) else ('amber' if s.enabled else 'grey') }}"></span>
+        <span class="name">{{ s.name }}</span>
+        {% if s.builtin %}<span class="sub">built-in</span>{% endif %}
+      </a>
+      {% if selected and s.server_id == selected.server_id %}
+      <div class="ld-sections">
+        {% for sec, label in [('overview','Overview'),('tools','Tools'),('usage','Used by')] %}
+        <a class="ld-item {% if section == sec %}active{% endif %}" href="/mcp/{{ s.server_id }}/{{ sec }}">{{ label }}</a>
+        {% endfor %}
       </div>
+      {% endif %}
       {% endfor %}
+    </nav>
+    <div class="ld-detail">
+      {% if not selected %}
+      {{ ui.empty("Pick a server", "Select one on the left to see what it offers, call a tool, or check which workflows use it.") }}
+      {% else %}
+      {% include "_mcp_detail.html" %}
+      {% endif %}
     </div>
   </div>
 </div>
+
+<dialog class="dialog" id="registry">
+  <div class="dialog-panel">
+    <button type="button" class="icon-button close" data-dialog-close aria-label="Close">{{ ui.icon('i-close','sm') }}</button>
+    <header><h2>Registry</h2><p>Servers Handoff knows how to run. Add one and connect its credential.</p></header>
+    <div class="rows">
+      {% for r in registry %}
+      <div class="row-item"><div class="stack grow" style="gap:1px"><span class="primary">{{ r.name }}</span><span class="secondary">{{ r.description }}</span><span class="meta">{{ r.transport }}{% if r.requires %} · needs {{ r.requires|join(', ') }}{% endif %}</span></div>
+        {% if r.installed %}{{ ui.status('ok','installed') }}{% else %}<form method="post" action="/mcp/registry/{{ r.name }}/install"><button class="button primary small" type="submit">Add</button></form>{% endif %}</div>
+      {% endfor %}
+    </div>
+  </div>
+</dialog>
 <dialog class="dialog" id="add-server">
-  <form class="dialog-panel" hx-post="/mcp/save" hx-target="body" hx-swap="outerHTML">
+  <form class="dialog-panel" method="post" action="/mcp/save">
     <button type="button" class="icon-button close" data-dialog-close aria-label="Close">{{ ui.icon('i-close','sm') }}</button>
     <header><h2>Add a tool server</h2><p>A local process over stdio, or a remote MCP endpoint over HTTP.</p></header>
     <div class="stack" style="gap: var(--size-3)">

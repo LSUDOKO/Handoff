@@ -1,0 +1,59 @@
+{% import "_page.html" as ui %}
+{% set s = selected %}
+<div class="stack" style="gap: var(--size-6)">
+  <div class="row" style="align-items: flex-start">
+    <div class="stack grow" style="gap: var(--size-1)">
+      <div class="row"><h2 class="text-xl text-bright" style="font-weight: 600">{{ s.name }}</h2>{% if s.builtin %}<span class="pill">built-in</span>{% endif %}
+        {% if not s.enabled %}{{ ui.status('disabled') }}{% elif s.ready %}{{ ui.status('ok','ready') }}{% else %}{{ ui.status('error','needs credentials') }}{% endif %}</div>
+      <p class="text-faded">{{ s.description }}</p>
+    </div>
+    <div class="row">
+      <button class="button secondary small" hx-post="/mcp/{{ s.server_id }}/probe" hx-target="body" hx-swap="outerHTML">{{ ui.icon('i-rotate','sm') }} Probe</button>
+      <button class="button secondary small" hx-post="/mcp/{{ s.server_id }}/toggle" hx-target="body" hx-swap="outerHTML">{{ 'Disable' if s.enabled else 'Enable' }}</button>
+      {% if not s.builtin %}<button class="button destructive small" hx-post="/mcp/{{ s.server_id }}/delete" hx-target="body" hx-swap="outerHTML" hx-confirm="Remove {{ s.name }}?">Remove</button>{% endif %}
+    </div>
+  </div>
+  {% if s.last_error %}<div class="callout error">{{ s.last_error }}</div>{% endif %}
+
+  {% if section == 'overview' %}
+  <div class="grid halves">
+    <div class="card"><header class="section-head"><h2 class="section-title">Connection</h2></header>
+      <dl class="kv"><dt>Transport</dt><dd class="mono">{{ s.transport }}</dd>
+        {% if s.command %}<dt>Command</dt><dd class="mono">{{ s.command }} {{ s.args|join(' ') }}</dd>{% endif %}
+        {% if s.url %}<dt>URL</dt><dd class="mono">{{ s.url }}</dd>{% endif %}
+        <dt>Needs</dt><dd>{% if s.required_env %}{% for v in s.required_env %}<span class="pill mono">{{ v }}</span> {% endfor %}{% else %}nothing — credential-free{% endif %}</dd>
+        <dt>Last probe</dt><dd>{% if s.tool_names %}{{ s.tool_names|length }} tools{% else %}never — press Probe{% endif %}</dd></dl></div>
+    <div class="card"><header class="section-head"><h2 class="section-title">Tools</h2><span class="section-count">{{ s.tool_names|length }}</span><a class="section-action" href="/mcp/{{ s.server_id }}/tools">Try one</a></header>
+      <div class="tool-list">{% for t in s.tool_names %}<span class="pill mono">{{ t }}</span>{% else %}<span class="text-faded text-xs">Probe to list them.</span>{% endfor %}</div></div>
+  </div>
+
+  {% elif section == 'tools' %}
+  {% if tools is none %}
+  <div class="callout warn">Couldn't connect: {{ s.last_error or 'set the credentials it needs, then probe again' }}.</div>
+  {% elif not tools %}
+  {{ ui.empty("No tools reported", "The server connected but offered nothing.") }}
+  {% else %}
+  <div class="grid two">
+    <div class="stack">
+      {% for t in tools %}
+      <details class="card flat" {% if loop.first %}open{% endif %}>
+        <summary class="row"><span class="mono text-bright">{{ t.name }}</span><span class="text-faded text-xs grow truncate">{{ t.description }}</span></summary>
+        <form class="stack" style="margin-block-start: var(--size-3)" hx-post="/mcp/{{ s.server_id }}/invoke" hx-target="#invoke-result" hx-swap="innerHTML" hx-disabled-elt="find button">
+          <input type="hidden" name="tool" value="{{ t.name }}">
+          <label class="field"><span>Arguments <em>(JSON)</em></span><textarea class="code" name="arguments" style="min-block-size: var(--size-28)">{{ t.example }}</textarea></label>
+          {% if t.schema_pretty %}<details><summary class="text-faded text-xs">Input schema</summary><pre class="text-2xs mono text-faded" style="white-space: pre-wrap">{{ t.schema_pretty }}</pre></details>{% endif %}
+          <div class="form-actions"><button class="button accent small" type="submit">{{ ui.icon('i-play','sm') }} Call {{ t.name }}</button></div>
+        </form>
+      </details>
+      {% endfor %}
+    </div>
+    <div class="stack"><div class="section-head"><h2 class="section-title">Result</h2></div><div id="invoke-result"><p class="text-faded text-xs">Call a tool to see exactly what an agent would get back.</p></div></div>
+  </div>
+  {% endif %}
+
+  {% elif section == 'usage' %}
+  {% if used_by %}
+  <div class="rows">{% for w in used_by %}<a class="row-item link" href="/platform/{{ workspace.workspace_id }}/workflows#{{ w.workflow_id }}"><span class="primary">{{ w.name }}</span><span class="meta ml-auto mono">{{ w.schedule or 'manual' }}</span></a>{% endfor %}</div>
+  {% else %}{{ ui.empty("No workflow uses this server yet", "Name it in a workflow's mcp_tools and it will be offered to the executor.") }}{% endif %}
+  {% endif %}
+</div>

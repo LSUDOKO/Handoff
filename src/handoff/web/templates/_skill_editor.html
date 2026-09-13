@@ -1,0 +1,25 @@
+{% import "_page.html" as ui %}
+{% set s = selected %}
+<div class="stack" style="gap: var(--size-5)">
+  <div class="row" style="align-items: flex-start">
+    <div class="stack grow" style="gap: var(--size-1)">
+      <div class="row"><h2 class="text-xl text-bright" style="font-weight:600">{{ s.name }}</h2>{% if s.builtin %}<span class="pill">built-in</span>{% endif %}{{ ui.status('active-ws' if s.enabled else 'disabled', 'enabled' if s.enabled else 'disabled') }}</div>
+      <p class="text-faded">{{ s.description }}</p>
+      <span class="text-faded text-2xs mono">{{ s.namespace }}:{{ s.name }} · {{ s.body|length }} chars · {{ s.history|length }} previous version{{ '' if s.history|length == 1 else 's' }}</span>
+    </div>
+    <div class="row">
+      <button class="button secondary small" hx-post="/skills/{{ s.skill_id }}/toggle" hx-target="body" hx-swap="outerHTML">{{ 'Disable' if s.enabled else 'Enable' }}</button>
+      {% if s.history %}<a class="button secondary small" href="/skills/{{ s.skill_id }}/diff">{{ ui.icon('i-rotate','sm') }} Compare</a>{% endif %}
+      {% if not s.builtin %}<button class="button destructive small" hx-post="/skills/{{ s.skill_id }}/delete" hx-target="body" hx-swap="outerHTML" hx-confirm="Delete {{ s.name }}?">Delete</button>{% endif %}
+    </div>
+  </div>
+  {% if diff %}
+  <div class="card flat"><header class="section-head"><h2 class="section-title">Changes since the previous version</h2><a class="section-action" href="/skills/{{ s.skill_id }}">Close</a></header>{{ ui.data('unified diff', diff) }}
+    <form method="post" action="/skills/{{ s.skill_id }}/restore" class="form-actions"><input type="hidden" name="version" value="0"><button class="button secondary small" type="submit">Restore previous version</button></form></div>
+  {% endif %}
+  <form class="stack" method="post" action="/skills/save">
+    <input type="hidden" name="skill_id" value="{{ s.skill_id }}">
+    <label class="field"><span>Skill document</span><textarea class="code" name="markdown" style="min-block-size: 56vh">{{ markdown }}</textarea></label>
+    <div class="form-actions"><button class="button accent" type="submit">Save changes</button><span class="text-faded text-xs">Saving keeps the previous version — Compare shows the diff.</span></div>
+  </form>
+</div>

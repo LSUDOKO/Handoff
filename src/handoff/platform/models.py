@@ -152,6 +152,8 @@ class Skill(BaseModel):
     body: str = ""
     enabled: bool = True
     builtin: bool = False
+    #: Previous versions, newest first, so an edit can be compared and undone.
+    history: list[dict[str, Any]] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
 

@@ -4,38 +4,33 @@
 {% block body %}
 <div class="page">
   {% call ui.title("Skills", "Judgement that differs between workspaces, written once and attached where it's needed.") %}
+    <button class="button secondary small" data-dialog="#import-skill">{{ ui.icon('i-upload','sm') }} Import</button>
     <button class="button primary small" data-dialog="#new-skill">{{ ui.icon('i-plus','sm') }} New skill</button>
   {% endcall %}
-  <div class="page-body">
-    {% if skills %}
-    <div class="rows">
-      {% for s in skills %}
-      <div class="row-item" id="skill-{{ s.skill_id }}">
-        <span class="provider-mark">{{ ui.icon('i-compass','sm') }}</span>
-        <div class="stack grow" style="gap: 2px">
-          <span class="row"><a class="primary" href="/skills/{{ s.skill_id }}">{{ s.name }}</a>{% if s.builtin %}<span class="pill">built-in</span>{% endif %}{{ ui.status('active-ws' if s.enabled else 'disabled', 'enabled' if s.enabled else 'disabled') }}</span>
-          <span class="secondary">{{ s.description }}</span>
-          <span class="meta mono">{{ s.namespace }}:{{ s.name }} · {{ s.body|length }} chars</span>
-        </div>
-        <span class="controls">
-          <a class="button secondary small" href="/skills/{{ s.skill_id }}">Open</a>
-          <button class="button secondary small" hx-post="/skills/{{ s.skill_id }}/toggle" hx-target="body" hx-swap="outerHTML">{{ 'Disable' if s.enabled else 'Enable' }}</button>
-          {% if not s.builtin %}<button class="button destructive small" hx-post="/skills/{{ s.skill_id }}/delete" hx-target="body" hx-swap="outerHTML" hx-confirm="Delete {{ s.name }}?">Delete</button>{% endif %}
-        </span>
-      </div>
+  <div class="list-detail">
+    <nav class="ld-list tree">
+      {% for ns, items in groups.items() %}
+      <details open><summary>{{ ui.icon('i-caret-right','xs caret') }}{{ ui.icon('i-folder','sm') }} <span class="text-bright">{{ ns }}</span><span class="text-faded text-2xs">{{ items|length }}</span></summary>
+        {% for s in items %}
+        <a class="leaf {% if selected and s.skill_id == selected.skill_id %}active{% endif %}" href="/skills/{{ s.skill_id }}">{{ ui.icon('i-doc','sm') }}<span class="truncate">{{ s.name }}</span>{% if not s.enabled %}<span class="text-faded text-2xs ml-auto">off</span>{% endif %}</a>
+        {% endfor %}
+      </details>
       {% endfor %}
+    </nav>
+    <div class="ld-detail">
+      {% if not selected %}
+      {% call ui.empty("Add a skill", "Package your expertise into skills. Agents load the right one for each task and follow it exactly.") %}
+        <div class="actions"><button class="button primary" data-dialog="#new-skill">Write one</button><button class="button secondary" data-dialog="#import-skill">Import a file or folder</button></div>
+      {% endcall %}
+      {% else %}{% include "_skill_editor.html" %}{% endif %}
     </div>
-    {% else %}
-    {{ ui.empty("No skills yet", "Package your expertise into skills. Agents load the right one for each task and follow it exactly.") }}
-    {% endif %}
   </div>
 </div>
 <dialog class="dialog" id="new-skill">
-  <form class="dialog-panel wide" hx-post="/skills/save" hx-target="body" hx-swap="outerHTML">
+  <form class="dialog-panel wide" method="post" action="/skills/save">
     <button type="button" class="icon-button close" data-dialog-close aria-label="Close">{{ ui.icon('i-close','sm') }}</button>
     <header><h2>New skill</h2><p>Markdown with front matter. The description is what an agent reads to decide whether the body is worth loading.</p></header>
-    <label class="field"><span>Skill document</span>
-      <textarea class="code" name="markdown" required>---
+    <label class="field"><span>Skill document</span><textarea class="code" name="markdown" required>---
 name: my-skill
 description: When this applies, and what it covers. One or two sentences.
 ---
@@ -43,6 +38,14 @@ description: When this applies, and what it covers. One or two sentences.
 The instruction itself. Be specific about what to do and what not to.
 </textarea></label>
     <footer><button type="button" class="button secondary" data-dialog-close>Cancel</button><button type="submit" class="button accent">Save skill</button></footer>
+  </form>
+</dialog>
+<dialog class="dialog" id="import-skill">
+  <form class="dialog-panel" method="post" action="/skills/import" enctype="multipart/form-data">
+    <button type="button" class="icon-button close" data-dialog-close aria-label="Close">{{ ui.icon('i-close','sm') }}</button>
+    <header><h2>Import skills</h2><p>One or more <code class="mono">.md</code> files, or a zip of a skills folder (a <code class="mono">SKILL.md</code> per directory).</p></header>
+    <label class="field"><span>Files</span><input class="input" type="file" name="files" accept=".md,.markdown,.txt,.zip" multiple required></label>
+    <footer><button type="button" class="button secondary" data-dialog-close>Cancel</button><button type="submit" class="button accent">Import</button></footer>
   </form>
 </dialog>
 {% endblock %}

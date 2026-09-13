@@ -3,44 +3,23 @@
 {% block title %}Memory — Handoff{% endblock %}
 {% block body %}
 <div class="page">
-  {{ ui.title("Memory", "What it carries between runs. Every rule here is one it acts on without asking — worth reading.") }}
+  {{ ui.title("Memory", "What it carries between runs, by workspace. Every rule here is one it acts on without asking — worth reading.") }}
   <div class="page-body">
-    <div class="stack" style="gap: var(--size-8)">
+    <div class="stack" style="gap: var(--size-6)">
       <section class="stat-strip">
         <div class="stat"><span class="v">{{ rules|length }}</span><span class="k">learned rules</span></div>
-        <div class="stat"><span class="v">{{ stores|length }}</span><span class="k">memory stores</span></div>
+        <div class="stat"><span class="v">{{ entries_total }}</span><span class="k">memory entries</span></div>
         <div class="stat"><span class="v" style="font-size: var(--font-size-5)">{{ backend }}</span><span class="k">backend</span></div>
       </section>
-      <section class="stack">
-        <div class="section-head"><h2 class="section-title">Learned rules</h2><span class="section-count">applied before it asks</span></div>
-        {% if rules %}
-        <div class="table-wrap"><table class="table">
-          <thead><tr><th>Action</th><th>Rule</th><th>Matches</th><th class="num">Confidence</th><th class="num">Applied</th><th></th></tr></thead>
-          <tbody>
-            {% for r in rules %}
-            <tr id="rule-{{ r.preference_id }}">
-              <td><span class="by memory">{{ r.action|replace('_',' ') }}</span></td>
-              <td class="text-bright">{{ r.pattern }}{% if r.note %}<div class="text-faded text-2xs">“{{ r.note }}”</div>{% endif %}</td>
-              <td class="text-faded text-xs">{% if r.match_sender %}<span class="pill mono">{{ r.match_sender }}</span>{% endif %}{% for k in r.match_keywords %}<span class="pill">{{ k }}</span>{% endfor %}<div class="text-2xs">{{ r.preference_key }}</div></td>
-              <td class="num">{{ (r.confidence*100)|round|int }}%</td>
-              <td class="num">{{ r.times_applied }}</td>
-              <td><button class="button destructive small" hx-post="/memory/rules/{{ r.preference_id }}/delete" hx-target="body" hx-swap="outerHTML" hx-confirm="Forget this rule? It will start asking you about these again.">Forget</button></td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table></div>
-        {% else %}
-        {{ ui.empty("Nothing learned yet", "Answer a decision and the rule it draws lands here.") }}
-        {% endif %}
-      </section>
-      <section class="stack">
-        <div class="section-head"><h2 class="section-title">Stores</h2></div>
-        <div class="grid auto">
-          {% for s in stores %}
-          <div class="card"><div class="row"><span class="section-title">{{ s.name }}</span><span class="pill">{{ s.kind|replace('_',' ') }}</span></div><p class="text-faded text-xs">{{ s.description }}</p><span class="text-faded text-2xs mono">strategy {{ s.strategy }}</span></div>
-          {% endfor %}
-        </div>
-      </section>
+      <div class="grid auto">
+        {% for w in rows %}
+        <a class="card link" href="/memory/{{ w.workspace_id }}">
+          <div class="row"><span class="ws-dot" data-color="{{ w.color }}"></span><span class="section-title grow">{{ w.name }}</span>{% if w.is_default %}<span class="pill">default</span>{% endif %}</div>
+          <p class="text-faded text-xs">{{ w.description or 'No description.' }}</p>
+          <div class="row text-faded text-2xs"><span>{{ w.stores }} store{{ '' if w.stores == 1 else 's' }}</span><span>·</span><span>{{ w.rules }} rule{{ '' if w.rules == 1 else 's' }}</span><span>·</span><span>{{ w.entries }} entr{{ 'y' if w.entries == 1 else 'ies' }}</span></div>
+        </a>
+        {% endfor %}
+      </div>
     </div>
   </div>
 </div>

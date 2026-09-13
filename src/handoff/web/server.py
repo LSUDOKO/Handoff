@@ -11,7 +11,6 @@ The decision screen is the one that matters. Everything else is reporting.
 from __future__ import annotations
 
 import json
-import os
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
@@ -1189,23 +1188,103 @@ def credentials_disconnect(request: Request, credential_id: str):
 
 
 def _server_view(server) -> dict[str, Any]:
-    ready = all(os.getenv(var) for var in server.required_env) if server.required_env else True
-    return {**server.model_dump(mode="json"), "ready": ready}
+    from handoff.platform import mcp_service
+
+    return {**server.model_dump(mode="json"), "ready": mcp_service.is_ready(server)}
 
 
-@app.get("/mcp", response_class=HTMLResponse)
-def mcp_page(request: Request):
+def _mcp_page(request: Request, server_id: str = "", section: str = "overview"):
+    from handoff.platform import mcp_service
+
     store = get_store()
+    servers = [_server_view(x) for x in store.list_mcp_servers(None)]
+    selected = None
+    tools = None
+    used_by: list[dict[str, Any]] = []
+    if server_id:
+        row = store.mcp_servers.get("server_id", server_id)
+        if row is None:
+            raise HTTPException(404, "No such server")
+        selected = _server_view(row)
+        if section == "tools":
+            try:
+                tools = mcp_service.describe_tools(row) if mcp_service.is_ready(row) else None
+            except Exception as exc:
+                row.last_error = str(exc)[:200]
+                store.mcp_servers.put(row, "server_id")
+                selected = _server_view(row)
+                tools = None
+        elif section == "usage":
+            used_by = mcp_service.usage_of(row)
     return templates.TemplateResponse(
         request=request,
         name="mcp.html",
         context=_context(
-            request, "mcp", servers=[_server_view(s) for s in store.list_mcp_servers(None)]
+            request,
+            "mcp",
+            servers=servers,
+            selected=selected,
+            section=section,
+            tools=tools,
+            used_by=used_by,
+            registry=mcp_service.registry_catalogue(),
         ),
     )
 
 
-@app.post("/mcp/save", response_class=HTMLResponse)
+@app.get("/mcp", response_class=HTMLResponse)
+def mcp_page(request: Request):
+    return _mcp_page(request)
+
+
+@app.get("/mcp/{server_id}", response_class=HTMLResponse)
+def mcp_detail(request: Request, server_id: str):
+    return _mcp_page(request, server_id, "overview")
+
+
+@app.get("/mcp/{server_id}/{section}", response_class=HTMLResponse)
+def mcp_section(request: Request, server_id: str, section: str):
+    if section not in ("overview", "tools", "usage"):
+        raise HTTPException(404, "No such section")
+    return _mcp_page(request, server_id, section)
+
+
+@app.post("/mcp/{server_id}/invoke", response_class=HTMLResponse)
+def mcp_invoke(server_id: str, tool: str = Form(...), arguments: str = Form("{}")):
+    """Call one tool on a server from the UI and show the raw result."""
+    from handoff.platform import mcp_service
+
+    row = get_store().mcp_servers.get("server_id", server_id)
+    if row is None:
+        raise HTTPException(404, "No such server")
+    try:
+        args = json.loads(arguments or "{}")
+    except json.JSONDecodeError as exc:
+        return HTMLResponse(f'<div class="callout error">Arguments are not valid JSON: {exc}</div>')
+    try:
+        result = mcp_service.invoke(row, tool, args)
+    except Exception as exc:
+        return HTMLResponse(f'<div class="callout error">{tool} failed: {str(exc)[:400]}</div>')
+    body = (result.get("text") or "").replace("<", "&lt;")
+    status = "error" if result.get("status") == "error" else ""
+    return HTMLResponse(
+        f'<div class="data {status}"><div class="data-label">{tool} · {result.get("status", "success")}</div>'
+        f'<button type="button" class="button small secondary copy" data-copy>Copy</button><pre>{body}</pre></div>'
+    )
+
+
+@app.post("/mcp/registry/{name}/install")
+def mcp_registry_install(name: str):
+    from handoff.platform import mcp_service
+
+    try:
+        server = mcp_service.install_from_registry(name, _workspace().workspace_id)
+    except KeyError:
+        raise HTTPException(404, "Not in the registry") from None
+    return RedirectResponse(f"/mcp/{server.server_id}", status_code=303)
+
+
+@app.post("/mcp/save")
 def mcp_save(
     request: Request,
     name: str = Form(...),
@@ -1228,7 +1307,7 @@ def mcp_save(
         required_env=required_env.split(),
     )
     store.mcp_servers.put(server, "server_id")
-    return mcp_page(request)
+    return RedirectResponse(f"/mcp/{server.server_id}", status_code=303)
 
 
 @app.post("/mcp/{server_id}/toggle", response_class=HTMLResponse)
@@ -1238,27 +1317,19 @@ def mcp_toggle(request: Request, server_id: str):
     if server is not None:
         server.enabled = not server.enabled
         store.mcp_servers.put(server, "server_id")
-    return mcp_page(request)
+    return _mcp_page(request, server_id, "overview")
 
 
 @app.post("/mcp/{server_id}/probe", response_class=HTMLResponse)
 def mcp_probe(request: Request, server_id: str):
     """Actually connect and list the tools, so 'ready' is a fact not a guess."""
-    store = get_store()
-    server = store.mcp_servers.get("server_id", server_id)
+    from handoff.platform import mcp_service
+
+    server = get_store().mcp_servers.get("server_id", server_id)
     if server is None:
         raise HTTPException(404, "No such server")
-
-    from handoff.mcp.servers import get_client
-
-    try:
-        client = get_client(server.name)
-        server.tool_names = [t.tool_name for t in client.list_tools_sync()]
-        server.last_error = ""
-    except Exception as exc:
-        server.last_error = str(exc)[:200]
-    store.mcp_servers.put(server, "server_id")
-    return mcp_page(request)
+    mcp_service.probe(server)
+    return _mcp_page(request, server_id, "overview")
 
 
 @app.post("/mcp/{server_id}/delete", response_class=HTMLResponse)
@@ -1270,35 +1341,79 @@ def mcp_delete(request: Request, server_id: str):
 # --- skills -----------------------------------------------------------------
 
 
-@app.get("/skills", response_class=HTMLResponse)
-def skills_page(request: Request):
+def _skills_page(request: Request, skill_id: str = "", diff: str = ""):
     store = get_store()
+    skills = store.list_skills(None)
+    groups: dict[str, list] = {}
+    for sk in sorted(skills, key=lambda x: (x.namespace, x.name)):
+        groups.setdefault(sk.namespace, []).append(sk)
+    selected = store.skills.get("skill_id", skill_id) if skill_id else None
+    if skill_id and selected is None:
+        raise HTTPException(404, "No such skill")
     return templates.TemplateResponse(
         request=request,
         name="skills.html",
-        context=_context(request, "skills", skills=store.list_skills(None)),
+        context=_context(
+            request,
+            "skills",
+            skills=skills,
+            groups=groups,
+            selected=selected,
+            markdown=skills_mod.render(selected) if selected else "",
+            diff=diff,
+        ),
     )
+
+
+@app.get("/skills", response_class=HTMLResponse)
+def skills_page(request: Request):
+    return _skills_page(request)
 
 
 @app.get("/skills/{skill_id}", response_class=HTMLResponse)
 def skill_detail(request: Request, skill_id: str):
-    store = get_store()
-    skill = store.skills.get("skill_id", skill_id)
+    return _skills_page(request, skill_id)
+
+
+@app.get("/skills/{skill_id}/diff", response_class=HTMLResponse)
+def skill_diff(request: Request, skill_id: str):
+    skill = get_store().skills.get("skill_id", skill_id)
     if skill is None:
         raise HTTPException(404, "No such skill")
-    return templates.TemplateResponse(
-        request=request,
-        name="skill_detail.html",
-        context=_context(request, "skills", skill=skill, markdown=skills_mod.render(skill)),
-    )
+    return _skills_page(request, skill_id, diff=skills_mod.diff_with_previous(skill) or "(no changes)")
 
 
-@app.post("/skills/save", response_class=HTMLResponse)
-def skills_save(request: Request, markdown: str = Form(...), skill_id: str = Form("")):
-    skills_mod.save_from_markdown(
+@app.post("/skills/{skill_id}/restore")
+def skill_restore(skill_id: str, version: int = Form(0)):
+    skill = get_store().skills.get("skill_id", skill_id)
+    if skill is None or version >= len(skill.history):
+        raise HTTPException(404, "No such version")
+    old = skill.history[version]
+    text = f"---\nname: {skill.name}\ndescription: {old.get('description', '')}\n---\n\n{old.get('body', '')}"
+    skills_mod.save_from_markdown(text, skill_id=skill_id)
+    return RedirectResponse(f"/skills/{skill_id}", status_code=303)
+
+
+@app.post("/skills/save")
+def skills_save(markdown: str = Form(...), skill_id: str = Form("")):
+    skill = skills_mod.save_from_markdown(
         markdown, workspace_id=_workspace().workspace_id, skill_id=skill_id
     )
-    return skills_page(request)
+    return RedirectResponse(f"/skills/{skill.skill_id}", status_code=303)
+
+
+@app.post("/skills/import")
+async def skills_import(request: Request):
+    form = await request.form()
+    uploads = []
+    for item in form.getlist("files"):
+        if hasattr(item, "read"):
+            uploads.append((getattr(item, "filename", "") or "", await item.read()))
+    saved = skills_mod.import_files(uploads, workspace_id=_workspace().workspace_id)
+    target = f"/skills/{saved[0].skill_id}" if saved else "/skills"
+    response = RedirectResponse(target, status_code=303)
+    response.headers["X-Toast"] = f"Imported {len(saved)} skill(s)"
+    return response
 
 
 @app.post("/skills/{skill_id}/toggle", response_class=HTMLResponse)
@@ -1308,7 +1423,7 @@ def skills_toggle(request: Request, skill_id: str):
     if skill is not None:
         skill.enabled = not skill.enabled
         store.skills.put(skill, "skill_id")
-    return skills_page(request)
+    return _skills_page(request, skill_id)
 
 
 @app.post("/skills/{skill_id}/delete", response_class=HTMLResponse)
@@ -1625,17 +1740,82 @@ def artifact_raw(artifact_id: str):
 @app.get("/memory", response_class=HTMLResponse)
 def memory_page(request: Request):
     store = get_store()
+    rules = list_preferences()
+    entries = store.memory_entries.all()
+    rows = []
+    for w in store.list_workspaces():
+        rows.append(
+            {
+                "workspace_id": w.workspace_id,
+                "name": w.name,
+                "description": w.description,
+                "color": w.color,
+                "is_default": w.is_default,
+                "stores": len(store.list_memory_stores(w.workspace_id)),
+                "rules": len(rules) if w.is_default else 0,
+                "entries": sum(1 for e in entries if e.workspace_id == w.workspace_id),
+            }
+        )
     return templates.TemplateResponse(
         request=request,
         name="memory.html",
         context=_context(
             request,
             "memory",
-            rules=list_preferences(),
-            stores=store.list_memory_stores(None),
+            rows=rows,
+            rules=rules,
+            entries_total=len(entries),
             backend="AgentCore" if config.USE_AGENTCORE_MEMORY else "local",
         ),
     )
+
+
+def _memory_ws_page(request: Request, workspace_id: str):
+    store = get_store()
+    workspace = _select_workspace(workspace_id)
+    stores = store.list_memory_stores(workspace_id)
+    entries = sorted(
+        (e for e in store.memory_entries.all() if e.workspace_id == workspace_id),
+        key=lambda e: e.created_at,
+        reverse=True,
+    )
+    by_store: dict[str, int] = {}
+    for e in entries:
+        by_store[e.store_id] = by_store.get(e.store_id, 0) + 1
+    return templates.TemplateResponse(
+        request=request,
+        name="memory_ws.html",
+        context=_context(
+            request,
+            "memory",
+            workspace=workspace,
+            rules=list_preferences(),
+            stores=stores,
+            entries=entries,
+            entries_by_store=by_store,
+            store_names={x.store_id: x.name for x in stores},
+        ),
+    )
+
+
+@app.post("/memory/{workspace_id}/entries")
+def memory_entry_add(workspace_id: str, store_id: str = Form(""), key: str = Form(...), content: str = Form(...)):
+    from handoff.platform.models import MemoryEntry
+
+    get_store().memory_entries.put(
+        MemoryEntry(store_id=store_id, workspace_id=workspace_id, key=key.strip(), content=content.strip(), source="you"),
+        "entry_id",
+    )
+    return RedirectResponse(f"/memory/{workspace_id}", status_code=303)
+
+
+@app.post("/memory/entries/{entry_id}/delete", response_class=HTMLResponse)
+def memory_entry_delete(request: Request, entry_id: str):
+    store = get_store()
+    entry = store.memory_entries.get("entry_id", entry_id)
+    if entry is not None:
+        store.memory_entries.delete("entry_id", entry_id)
+    return _memory_ws_page(request, entry.workspace_id if entry else _workspace().workspace_id)
 
 
 @app.post("/memory/rules/{preference_id}/delete", response_class=HTMLResponse)
@@ -1648,47 +1828,137 @@ def memory_forget(request: Request, preference_id: str):
 
 
 @app.get("/usage", response_class=HTMLResponse)
-def usage_page(request: Request):
-    summary = usage_mod.summary(None)
-    biggest = max((m["total"] for m in summary["models"]), default=0) or 1
-    for model in summary["models"]:
-        model["share"] = round(model["total"] / biggest * 100)
+def usage_page(request: Request, workspace: str = "", model: str = ""):
+    from handoff.platform.usage import PRICES, bare_model_id, estimate_cost
+
+    store = get_store()
+    records = [r for r in store.list_usage(workspace or None) if not model or r.model == model]
+    all_models = sorted({r.model for r in store.list_usage(None)})
+
+    by_model: dict[str, dict[str, int]] = {}
+    for r in records:
+        bucket = by_model.setdefault(r.model, {"calls": 0, "input": 0, "output": 0})
+        bucket["calls"] += 1
+        bucket["input"] += r.input_tokens
+        bucket["output"] += r.output_tokens
+    models = []
+    for m, b in sorted(by_model.items(), key=lambda kv: -(kv[1]["input"] + kv[1]["output"])):
+        priced = bare_model_id(m) in PRICES
+        models.append(
+            {
+                "model": m, **b, "total": b["input"] + b["output"],
+                "cost": estimate_cost(m, b["input"], b["output"]),
+                "free": priced and PRICES[bare_model_id(m)] == (0.0, 0.0),
+                "priced": priced,
+            }
+        )
+    biggest = max((m["total"] for m in models), default=0) or 1
+    for m in models:
+        m["share"] = round(m["total"] / biggest * 100)
+
+    by_run: dict[str, dict[str, Any]] = {}
+    for r in records:
+        row = by_run.setdefault(r.run_id or "—", {"calls": 0, "tokens": 0, "cost": 0.0, "model": r.model, "at": r.at})
+        row["calls"] += 1
+        row["tokens"] += r.total_tokens
+        row["cost"] += estimate_cost(r.model, r.input_tokens, r.output_tokens)
+        row["at"] = max(row["at"], r.at)
+    per_run = []
+    for run_id, row in sorted(by_run.items(), key=lambda kv: kv[1]["at"], reverse=True)[:60]:
+        kind = "chat" if run_id.startswith("chat_") else ("agent" if run_id.startswith("arun_") else "run")
+        href = f"/chat/{run_id}" if kind == "chat" else (f"/inspector/{run_id}" if kind == "run" else "/agents")
+        per_run.append({**row, "label": run_id, "kind": kind, "href": href})
+
+    total_in = sum(r.input_tokens for r in records)
+    total_out = sum(r.output_tokens for r in records)
+    summary = {
+        "total_input": total_in, "total_output": total_out, "total_tokens": total_in + total_out,
+        "total_calls": len(records), "total_cost": sum(m["cost"] for m in models),
+        "runs": len(by_run), "per_run_tokens": round((total_in + total_out) / len(by_run)) if by_run else 0,
+        "models": models,
+    }
     return templates.TemplateResponse(
-        request=request, name="usage.html", context=_context(request, "usage", usage=summary)
+        request=request,
+        name="usage.html",
+        context=_context(
+            request, "usage", usage=summary, per_run=per_run, all_models=all_models,
+            filter_ws=workspace, filter_model=model,
+        ),
     )
 
 
 # --- discover ---------------------------------------------------------------
 
 
-@app.get("/discover", response_class=HTMLResponse)
-def discover_page(request: Request):
+def _discover_page(request: Request, slug_name: str = ""):
+    rows = marketplace.catalogue()
+    selected = next((t for t in rows if t["slug"] == slug_name), None) if slug_name else None
+    if slug_name and selected is None:
+        raise HTTPException(404, "No such template")
+    if selected is not None:
+        details = []
+        for wid in selected["workflows"]:
+            wf = marketplace._shipped_workflow(wid)
+            if wf is not None:
+                details.append({"name": wf.name, "description": wf.description, "schedule": _schedule_line(wf)})
+        selected = {**selected, "workflow_details": details}
     return templates.TemplateResponse(
         request=request,
         name="discover.html",
-        context=_context(request, "discover", templates=marketplace.catalogue()),
+        context=_context(request, "discover", templates=rows, selected=selected),
     )
 
 
-@app.post("/discover/{slug}/install", response_class=HTMLResponse)
-def discover_install(request: Request, slug: str):
+@app.get("/discover", response_class=HTMLResponse)
+def discover_page(request: Request):
+    return _discover_page(request)
+
+
+@app.get("/discover/{slug_name}", response_class=HTMLResponse)
+def discover_detail(request: Request, slug_name: str):
+    return _discover_page(request, slug_name)
+
+
+@app.post("/discover/{slug_name}/install")
+def discover_install(slug_name: str, workspace_id: str = Form("")):
     try:
-        marketplace.install(slug, _workspace().workspace_id)
+        result = marketplace.install(slug_name, workspace_id)
     except KeyError:
         raise HTTPException(404, "No such template") from None
     daemon.sync_schedules()
-    return discover_page(request)
+    _ACTIVE_WORKSPACE["id"] = result["workspace_id"]
+    response = RedirectResponse(f"/platform/{result['workspace_id']}", status_code=303)
+    response.headers["X-Toast"] = f"Imported {len(result['workflows_added'])} workflow(s)"
+    return response
 
 
 # --- settings ---------------------------------------------------------------
 
 
 def _settings_page(request: Request, flash: str = "", kind: str = "ok"):
+    from handoff.platform import settings as settings_mod
+
     return templates.TemplateResponse(
         request=request,
         name="settings.html",
-        context=_context(request, "settings", flash=flash, flash_kind=kind),
+        context=_context(request, "settings", flash=flash, flash_kind=kind, models=settings_mod.current()),
     )
+
+
+@app.post("/settings/models", response_class=HTMLResponse)
+async def settings_models(request: Request):
+    from handoff.platform import settings as settings_mod
+
+    form = await request.form()
+    provider = str(form.get("provider", ""))
+    primary = str(form.get(f"primary_{provider}", ""))
+    fallback = str(form.get(f"fallback_{provider}", ""))
+    try:
+        result = settings_mod.save(provider, primary, fallback)
+    except ValueError as exc:
+        return _settings_page(request, flash=str(exc), kind="error")
+    note = " Restart Handoff for the provider change to take effect." if result["restart_needed"] else ""
+    return _settings_page(request, flash=f"Models saved: {result['primary']} → {result['fallback'] or 'no fallback'}.{note}")
 
 
 @app.get("/settings", response_class=HTMLResponse)
@@ -1770,5 +2040,4 @@ def workspace_section(request: Request, workspace_id: str, section: str):
 
 @app.get("/memory/{workspace_id}", response_class=HTMLResponse)
 def workspace_memory(request: Request, workspace_id: str):
-    _select_workspace(workspace_id)
-    return memory_page(request)
+    return _memory_ws_page(request, workspace_id)

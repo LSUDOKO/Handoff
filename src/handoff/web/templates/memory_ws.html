@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% import "_page.html" as ui %}
+{% block title %}Memory — {{ workspace.name }} — Handoff{% endblock %}
+{% block body %}
+<div class="page">
+  {{ ui.title("Memory", "Rules it learned from your decisions, and notes it keeps between runs.", [{"label": "Memory", "href": "/memory"}, {"label": workspace.name, "href": "/platform/" ~ workspace.workspace_id}]) }}
+  <div class="page-body">
+    <div class="stack" style="gap: var(--size-8)">
+      <section class="stack">
+        <div class="section-head"><h2 class="section-title">Learned rules</h2><span class="section-count">applied before it asks</span></div>
+        {% if rules %}
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th>Action</th><th>Rule</th><th>Matches</th><th class="num">Confidence</th><th class="num">Applied</th><th></th></tr></thead>
+          <tbody>
+            {% for r in rules %}
+            <tr id="rule-{{ r.preference_id }}">
+              <td><span class="by memory">{{ r.action|replace('_',' ') }}</span></td>
+              <td class="text-bright">{{ r.pattern }}{% if r.note %}<div class="text-faded text-2xs">“{{ r.note }}”</div>{% endif %}</td>
+              <td class="text-faded text-xs">{% if r.match_sender %}<span class="pill mono">{{ r.match_sender }}</span>{% endif %}{% for k in r.match_keywords %}<span class="pill">{{ k }}</span>{% endfor %}<div class="text-2xs">{{ r.preference_key }}</div></td>
+              <td class="num">{{ (r.confidence*100)|round|int }}%</td>
+              <td class="num">{{ r.times_applied }}</td>
+              <td><button class="button destructive small" hx-post="/memory/rules/{{ r.preference_id }}/delete" hx-target="body" hx-swap="outerHTML" hx-confirm="Forget this rule? It will start asking you about these again.">Forget</button></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table></div>
+        {% else %}{{ ui.empty("Nothing learned yet", "Answer a decision and the rule it draws lands here.") }}{% endif %}
+      </section>
+
+      <section class="stack">
+        <div class="section-head"><h2 class="section-title">Stores</h2><span class="section-count">{{ stores|length }}</span></div>
+        <div class="grid auto">
+          {% for s in stores %}
+          <div class="card"><div class="row"><span class="section-title">{{ s.name }}</span><span class="pill">{{ s.kind|replace('_',' ') }}</span></div><p class="text-faded text-xs">{{ s.description }}</p><span class="text-faded text-2xs mono">strategy {{ s.strategy }} · {{ entries_by_store.get(s.store_id, 0) }} entries</span></div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="stack">
+        <div class="section-head"><h2 class="section-title">Entries</h2><span class="section-count">notes an agent, or you, wrote down</span></div>
+        <form class="row" method="post" action="/memory/{{ workspace.workspace_id }}/entries" style="align-items: flex-end; flex-wrap: wrap">
+          <label class="field" style="inline-size: 12rem"><span>Store</span><select name="store_id" class="input">{% for s in stores %}<option value="{{ s.store_id }}">{{ s.name }}</option>{% endfor %}</select></label>
+          <label class="field" style="inline-size: 12rem"><span>Key</span><input name="key" placeholder="manager" required></label>
+          <label class="field grow"><span>Content</span><input name="content" placeholder="My manager is Dana; reply to her mail same day." required></label>
+          <button class="button primary" type="submit">Add</button>
+        </form>
+        {% if entries %}
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th>Key</th><th>Content</th><th>Store</th><th>Source</th><th>When</th><th></th></tr></thead>
+          <tbody>{% for e in entries %}<tr><td class="mono">{{ e.key }}</td><td class="text-bright">{{ e.content }}</td><td class="text-faded">{{ store_names.get(e.store_id, '—') }}</td><td class="text-faded">{{ e.source or 'you' }}</td><td class="text-faded">{{ ui.ago(e.created_at) }}</td><td><button class="button destructive small" hx-post="/memory/entries/{{ e.entry_id }}/delete" hx-target="body" hx-swap="outerHTML">Delete</button></td></tr>{% endfor %}</tbody>
+        </table></div>
+        {% else %}<p class="text-faded text-xs">No entries yet.</p>{% endif %}
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}
