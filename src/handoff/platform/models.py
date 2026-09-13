@@ -341,6 +341,9 @@ class Chat(BaseModel):
     agent_id: str = "handoff"
     #: "chat" is typed; "voice" is the one the orb talks to — one per workspace.
     kind: str = "chat"
+    #: What the last spoken turns produced, so the orb page can redraw them.
+    last_workflow_id: str = ""
+    last_run_id: str = ""
     title: str = "New chat"
     preview: str = ""
     turns: int = 0

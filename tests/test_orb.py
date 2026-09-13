@@ -88,6 +88,20 @@ class TestVoiceTools:
         assert saved and saved[0]["config"]["name"] == "Voice test" and saved[0]["workflow_id"] == "voice-test"
         assert saved[0]["turn"] == 3  # the page follows one turn; the event must carry it
 
+    def test_tools_remember_what_they_produced_on_the_chat(self, triage_workflow):
+        from handoff.chat import get_chat_service
+        from handoff.chat.voice_tools import current_channel, start_run
+        from handoff.store import get_store
+
+        chat = get_chat_service().voice_chat(get_store().default_workspace().workspace_id)
+        token = current_channel.set(f"chat:{chat.chat_id}")
+        try:
+            out = start_run(triage_workflow.workflow_id)
+        finally:
+            current_channel.reset(token)
+        row = get_store().get_chat(chat.chat_id)
+        assert row.last_run_id == out["run_id"] and row.last_workflow_id == triage_workflow.workflow_id
+
     def test_activate_workflow_rejects_bad_json(self):
         from handoff.chat.voice_tools import activate_workflow
 

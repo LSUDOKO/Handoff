@@ -593,7 +593,7 @@ def _chat_page(request: Request, chat_id: str):
             "chat",
             workspace=workspace,
             chat=chat,
-            chats=svc.list(workspace.workspace_id),
+            chats=[c for c in svc.list(workspace.workspace_id) if c.kind != "voice"],
             blocks=blocks,
             live_turn=svc.is_busy(chat_id),
             templates_list=[
@@ -862,6 +862,11 @@ def orb_page(request: Request):
     workspace = _workspace()
     chat = svc.voice_chat(workspace.workspace_id)
     store = get_store()
+    last_workflow = store.get_workflow(chat.last_workflow_id) if chat.last_workflow_id else None
+    last_run = store.get_run(chat.last_run_id) if chat.last_run_id else None
+    # The graph is redrawn only while its events are still in memory; a run
+    # from before a restart has its trace in the inspector instead.
+    run_live = bool(last_run and events.history(last_run.run_id))
     return templates.TemplateResponse(
         request=request,
         name="orb.html",
@@ -874,6 +879,8 @@ def orb_page(request: Request):
             live_turn=svc.is_busy(chat.chat_id),
             speech=speech.status(),
             pending=[_decision_context(request, p) for p in store.pending_interrupts()][:3],
+            last_card=({"source": "voice", **_work_card_context(last_workflow)} if last_workflow else None),
+            last_run=last_run if run_live else None,
         ),
     )
 
@@ -2261,6 +2268,13 @@ async def settings_models(request: Request):
         return _settings_page(request, flash=str(exc), kind="error")
     note = " Restart Handoff for the provider change to take effect." if result["restart_needed"] else ""
     return _settings_page(request, flash=f"Models saved: {result['primary']} → {result['fallback'] or 'no fallback'}.{note}")
+
+
+def _speech_label() -> str:
+    from handoff import speech
+
+    st = speech.status()
+    return {"aws": f"Amazon Transcribe + Polly {st['voice']} ({st['region']})", "groq": "Groq Whisper + Orpheus", "browser": "browser only"}[st["provider"]]
 
 
 @app.get("/settings", response_class=HTMLResponse)

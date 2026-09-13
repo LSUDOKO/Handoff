@@ -274,7 +274,9 @@
   document.addEventListener("keyup", (e) => { if (e.code !== "Space") return; spaceHeld = false; if (rec && !handsfree) rec.stop(); });
   addEventListener("pagehide", () => { closeMic(); stopSpeaking(); });
 
-  // Resume a reply that was mid-flight when the page opened; auto-listen when asked to.
+  // Redraw the last run's graph from its replayed events; resume a reply that
+  // was mid-flight when the page opened; auto-listen when asked to.
+  if (page.dataset.lastRun && window.WorkPanel) WorkPanel.watchRun(page.dataset.lastRun, { workflow_id: page.dataset.lastRunWorkflow, mcp_tools: (page.dataset.lastRunTools || "").split(",").filter(Boolean), trigger: "you" });
   if (page.dataset.liveTurn) follow(Number(page.dataset.liveTurn));
   if (pendingCount()) setMode("idle", "Say archive it, file a ticket, draft a reply, or leave it.");
   if (page.dataset.listen === "1") setTimeout(startListening, 300);

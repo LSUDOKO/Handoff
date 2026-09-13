@@ -198,8 +198,11 @@ class ChatService:
         return chat
 
     def latest(self, workspace_id: str) -> Chat | None:
-        chats = self.list(workspace_id)
-        return chats[0] if chats else None
+        """The most recent typed chat; the spoken one belongs to the orb."""
+        for chat in self.list(workspace_id):
+            if chat.kind != "voice":
+                return chat
+        return None
 
     def delete(self, chat_id: str) -> None:
         get_store().delete_chat(chat_id)

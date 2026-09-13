@@ -36,6 +36,20 @@ def _emit(kind: str, text: str, **data) -> None:
         events.emit(channel, kind, text, turn=current_turn.get(), **data)
 
 
+def _remember(**fields: str) -> None:
+    """Note on the chat row what this turn produced; the page redraws it on load."""
+    channel = current_channel.get()
+    if not channel.startswith("chat:"):
+        return
+    store = get_store()
+    chat = store.get_chat(channel.split(":", 1)[1])
+    if chat is None:
+        return
+    for key, value in fields.items():
+        setattr(chat, key, value)
+    store.save_chat(chat)
+
+
 @tool
 def activate_workflow(config_json: str) -> dict:
     """Save a workflow config and switch it on, in one step.
@@ -78,6 +92,7 @@ def activate_workflow(config_json: str) -> dict:
         workflow_id=workflow.workflow_id,
         config=workflow.model_dump(mode="json"),
     )
+    _remember(last_workflow_id=workflow.workflow_id)
     return {
         "ok": True,
         "workflow_id": workflow.workflow_id,
@@ -120,6 +135,8 @@ def start_run(workflow_id: str) -> dict:
         workflow_name=workflow.name,
         mcp_tools=list(workflow.mcp_tools),
     )
+
+    _remember(last_run_id=run.run_id, last_workflow_id=workflow_id)
 
     def target() -> None:
         try:

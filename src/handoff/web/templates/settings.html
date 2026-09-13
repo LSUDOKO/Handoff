@@ -49,7 +49,7 @@
           <dt>Notifications</dt><dd>{{ settings.notify_channel }}</dd>
           <dt>Tracing</dt><dd>{{ 'OTEL → ' + settings.otel_exporter if settings.otel_enabled else 'off' }}</dd>
           <dt>Scheduler</dt><dd>{{ 'running, checks every ' ~ scheduler.tick_seconds ~ 's' if scheduler.running else 'idle' }}</dd>
-          <dt>Voice</dt><dd>{{ 'Whisper + Orpheus' if voice_enabled else 'browser speech only' }}</dd>
+          <dt>Voice</dt><dd>{{ speech_label }}</dd>
         </dl>
       </section>
 
