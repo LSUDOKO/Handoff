@@ -13,6 +13,7 @@ html { overscroll-behavior: none; }
 
 body {
   -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
   background-color: var(--surface-dark);
   block-size: 100dvh;
   color: var(--text);
@@ -24,7 +25,7 @@ body {
 a, button { color: var(--text-bright); }
 a:hover { color: var(--text-bright); }
 :focus-visible { outline: 1px solid var(--text-bright); outline-offset: 1px; border-radius: var(--radius-1); }
-::selection { background: color-mix(in srgb, var(--blue), transparent 75%); }
+::selection { background: color-mix(in oklab, var(--accent) 22%, transparent); }
 
 .text-2xs { font-size: var(--font-size-1); }
 .text-xs  { font-size: var(--font-size-2); }
@@ -116,9 +117,10 @@ svg.icon.xs { inline-size: 12px; block-size: 12px; }
   top: 0;
   z-index: 1;
 }
-.sidebar-header .brand { display: flex; align-items: center; gap: var(--size-2); color: var(--text-bright); }
-.sidebar-header .brand svg { inline-size: 20px; block-size: 20px; color: var(--blue); }
-.sidebar-header h1 { font-size: var(--font-size-5); font-weight: var(--font-weight-6); }
+.sidebar-header .brand { display: flex; align-items: center; gap: var(--size-2); color: var(--text-bright); text-decoration: none; }
+.brand-mark { inline-size: 26px; block-size: 26px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; flex: none; }
+.brand-mark::after { content: ""; inline-size: 9px; block-size: 9px; border-radius: 2px; background: var(--accent-ink); transform: rotate(45deg); }
+.wordmark { font-family: var(--font-brand); font-size: 19px; font-weight: 600; letter-spacing: -0.02em; color: var(--accent); line-height: 1; }
 .sidebar-header .theme { margin-inline-start: auto; }
 
 .sidebar-nav {
@@ -174,8 +176,18 @@ summary::-webkit-details-marker { display: none; }
 .nav-item svg.icon { opacity: 0.55; transition: opacity 100ms; }
 .nav-item:hover { color: var(--text-bright); }
 .nav-item:hover svg.icon { opacity: 0.8; }
-.nav-item[aria-current="page"], .nav-item.active { background: var(--highlight); color: var(--text-bright); }
-.nav-item[aria-current="page"] svg.icon, .nav-item.active svg.icon { opacity: 1; }
+.nav-item.active { background: var(--highlight); color: var(--text-bright); }
+.nav-item.active svg.icon { opacity: 1; }
+/* The current page is a nav pill: ink in light, chalk in dark, with the
+   inset highlights that make it read as a key rather than a highlight. */
+.nav-item[aria-current="page"] {
+  background: color-mix(in oklab, var(--wash) 92%, var(--surface-dark));
+  color: var(--surface-dark);
+  border-radius: var(--radius-round);
+  box-shadow: inset 0 1.5px 1px color-mix(in oklab, white 30%, transparent), inset 0 -3px 6px color-mix(in oklab, black 25%, transparent), 0 2px 5px color-mix(in oklab, black 25%, transparent);
+}
+.nav-item[aria-current="page"] svg.icon { opacity: 1; }
+.nav-item[aria-current="page"]:hover { color: var(--surface-dark); }
 .nav-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .pending-badge {
@@ -353,13 +365,31 @@ summary::-webkit-details-marker { display: none; }
 .button svg.icon { inline-size: 14px; block-size: 14px; opacity: 0.7; }
 .button[href], .button:not([disabled]) { cursor: pointer; }
 .button[disabled], .button[aria-disabled="true"] { color: var(--text-faded); pointer-events: none; opacity: 0.7; }
-.button.primary { background: var(--surface); box-shadow: var(--shadow-1); }
-.button.primary:hover { background: color-mix(in srgb, var(--surface), var(--text) 4%); }
-.button.secondary { background: var(--highlight-bright); }
-.button.secondary:hover { background: color-mix(in srgb, var(--highlight-bright), var(--text) 6%); }
-.button.accent { background: var(--text-bright); color: var(--surface); }
-.button.accent:hover { background: color-mix(in srgb, var(--text-bright), var(--surface) 12%); }
-.button.needs { background: var(--needs-you); color: light-dark(white, var(--grey-100)); }
+.button.primary { background: var(--surface); box-shadow: var(--shadow-1); border-radius: var(--radius-round); }
+.button.primary:hover { background: color-mix(in oklab, var(--surface), var(--text) 4%); }
+/* Frosted glass pill: a wash tint with a specular top edge and blur. */
+.button.secondary {
+  background: linear-gradient(-75deg, color-mix(in oklab, var(--wash) 4%, transparent), color-mix(in oklab, var(--wash) 12%, transparent), color-mix(in oklab, var(--wash) 4%, transparent)), color-mix(in oklab, var(--wash) 7%, transparent);
+  border: 1px solid color-mix(in oklab, var(--wash) 14%, transparent);
+  border-radius: var(--radius-round);
+  box-shadow: inset 0 1px 2px color-mix(in oklab, var(--wash) 20%, transparent), inset 0 -2px 3px color-mix(in oklab, black 12%, transparent);
+  backdrop-filter: blur(14px) saturate(1.25);
+  -webkit-backdrop-filter: blur(14px) saturate(1.25);
+}
+.button.secondary:hover { transform: scale(0.975); }
+.button.secondary:active { transform: scale(0.955); }
+/* Solid accent: ink in light, champagne in dark. */
+.button.accent {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: var(--radius-round);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, white 30%, transparent), inset 0 -2px 4px color-mix(in oklab, black 15%, transparent), 0 3px 10px color-mix(in oklab, black 22%, transparent);
+  transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s;
+}
+.button.accent:hover { transform: scale(0.975); color: var(--accent-ink); }
+.button.accent:active { transform: scale(0.955); }
+.button.accent svg.icon { opacity: 0.9; }
+.button.needs { background: var(--needs-you); color: light-dark(white, var(--grey-100)); border-radius: var(--radius-round); }
 .button.destructive { background: var(--highlight-bright); color: var(--red); }
 .button.destructive:hover { background: color-mix(in srgb, var(--highlight-bright), var(--red) 8%); }
 .button.ghost { min-inline-size: 0; padding-inline: var(--size-1); color: var(--text-faded); }
@@ -446,7 +476,7 @@ kbd { background: var(--highlight); border-radius: var(--radius-1); color: var(-
 
 .card {
   background: var(--surface);
-  border-radius: var(--radius-4);
+  border-radius: var(--radius-7);
   box-shadow: var(--shadow-1);
   display: flex;
   flex-direction: column;
@@ -456,7 +486,9 @@ kbd { background: var(--highlight); border-radius: var(--radius-1); color: var(-
 }
 .card.flat { box-shadow: none; background: var(--surface-2); }
 .card.link { color: inherit; cursor: pointer; transition: box-shadow 150ms; }
-.card.link:hover { box-shadow: var(--shadow-4); }
+.card.link { transition: transform 0.4s var(--ease-smooth-decel), box-shadow 0.4s var(--ease-smooth-decel); }
+.card.link:hover { box-shadow: var(--shadow-4); transform: translateY(-2px); }
+.card.panel { border-radius: 22px; box-shadow: var(--shadow-float); background: color-mix(in oklab, var(--surface) 70%, var(--surface-dark)); }
 .card.needs { box-shadow: var(--shadow-1), inset 3px 0 0 var(--needs-you); }
 
 .section-head { align-items: baseline; display: flex; gap: var(--size-2-5); }

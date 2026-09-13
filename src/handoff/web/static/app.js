@@ -26,7 +26,16 @@
     const current = readTheme() || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     const next = current === "dark" ? "light" : "dark";
     try { localStorage.setItem(THEME_KEY, next); } catch {}
-    applyTheme(next);
+    // The new theme spreads out from the button as a circle. Browsers without
+    // the View Transitions API, and people who prefer reduced motion, switch instantly.
+    if (!document.startViewTransition || matchMedia("(prefers-reduced-motion: reduce)").matches) { applyTheme(next); return; }
+    const x = e.clientX || innerWidth - 40, y = e.clientY || 40;
+    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    const t = document.startViewTransition(() => applyTheme(next));
+    t.ready.then(() => document.documentElement.animate(
+      { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+      { duration: 900, easing: "cubic-bezier(0.16, 1, 0.3, 1)", pseudoElement: "::view-transition-new(root)" },
+    ));
   });
 
   // ---- Toasts ------------------------------------------------------------------

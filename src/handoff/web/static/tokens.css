@@ -63,10 +63,13 @@
   --radius-7: 1.25rem;
   --radius-round: 9999px;
 
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-    "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-    "Courier New", monospace;
+  /* Instrument Sans for everything, Comfortaa for the wordmark only, JetBrains
+     Mono for code and ids. The system stacks stay as fallbacks. */
+  --font-sans: "Instrument Sans", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-brand: "Comfortaa", var(--font-sans);
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
 
   /* 13px is the base; eight steps. */
   --font-size-1: 0.6875rem; /* 11 */
@@ -97,26 +100,36 @@
   --layer-5: 50;
 
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-smooth: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-smooth-decel: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* ---- Primitives ------------------------------------------------------ */
+  /* The kelbro cream: warm near-neutrals in oklch. Light is paper and ink;
+     dark is charcoal and champagne. */
+  --cream-ground: oklch(0.965 0.008 85);
+  --cream-card: oklch(0.98 0.005 85);
+  --cream-bright: oklch(0.99 0.004 85);
+  --cream-muted: oklch(0.92 0.006 85);
+  --cream-muted-2: oklch(0.895 0.008 85);
+  --ink: oklch(0.19 0 0);
+  --paper: oklch(0.99 0 0);
+
+  --char-ground: oklch(0.16 0.006 85);
+  --char-card: oklch(0.20 0.005 85);
+  --char-bright: oklch(0.24 0.006 85);
+  --char-muted: oklch(0.22 0.006 85);
+  --char-muted-2: oklch(0.26 0.006 85);
+  --chalk: oklch(0.93 0.005 85);
+  --champagne: oklch(0.9 0.035 70);
+  --champagne-ink: oklch(0.25 0.01 40);
+
   --grey-100: rgb(19 19 20);
-  --grey-200: rgb(27 28 30);
-  --grey-300: rgb(36 37 39);
-  --grey-400: rgb(41 42 45);
-  --grey-500: rgb(50 51 54);
   --grey-600: rgb(132 133 131);
   --grey-900: rgb(255 255 255);
 
-  --slate-200: rgb(26 30 46);
-  --slate-300: rgb(69 73 90);
-  --slate-500: rgb(115 119 132);
-
-  --cream-700: rgb(198 197 190);
-  --cream-800: rgb(231 229 227);
-  --cream-850: rgb(242 240 233);
-  --cream-900: rgb(245 243 241);
-
-  --amber-300: rgb(214 130 0);
+  --amber-300: rgb(196 118 0);
   --amber-600: rgb(255 196 61);
   --red-300: rgb(196 42 10);
   --red-600: rgb(255 104 80);
@@ -128,20 +141,26 @@
   --purple-600: rgb(178 140 255);
 
   /* ---- Semantic --------------------------------------------------------- */
-  --surface-dark: light-dark(var(--cream-900), var(--grey-100));
-  --surface: light-dark(var(--grey-900), var(--grey-200));
-  --surface-bright: light-dark(var(--cream-900), var(--grey-400));
-  --surface-2: light-dark(rgb(240 239 236), var(--grey-300));
+  --surface-dark: light-dark(var(--cream-ground), var(--char-ground));
+  --surface: light-dark(var(--cream-card), var(--char-card));
+  --surface-bright: light-dark(var(--cream-bright), var(--char-bright));
+  --surface-2: light-dark(var(--cream-muted), var(--char-muted));
 
-  --highlight: light-dark(var(--cream-800), var(--grey-300));
-  --highlight-bright: light-dark(var(--cream-800), var(--grey-400));
+  --highlight: light-dark(var(--cream-muted), var(--char-muted));
+  --highlight-bright: light-dark(var(--cream-muted-2), var(--char-muted-2));
 
-  --border: light-dark(var(--cream-800), var(--grey-300));
-  --border-bright: light-dark(rgb(219 217 214), var(--grey-500));
+  --border: light-dark(oklch(0.19 0 0 / 0.1), oklch(0.93 0 0 / 0.12));
+  --border-bright: light-dark(oklch(0.19 0 0 / 0.17), oklch(0.93 0 0 / 0.2));
 
-  --text-bright: light-dark(var(--slate-200), var(--cream-850));
-  --text: light-dark(var(--slate-300), var(--cream-700));
-  --text-faded: light-dark(var(--slate-500), var(--grey-600));
+  --text-bright: light-dark(var(--ink), var(--chalk));
+  --text: light-dark(oklch(0.19 0 0 / 0.78), oklch(0.93 0.005 85 / 0.78));
+  --text-faded: light-dark(oklch(0.19 0 0 / 0.55), oklch(0.93 0 0 / 0.5));
+
+  /* The accent is ink in light and champagne in dark; --accent-ink is what
+     sits on top of it. --wash is the tint every glass surface is mixed from. */
+  --accent: light-dark(var(--ink), var(--champagne));
+  --accent-ink: light-dark(var(--paper), var(--champagne-ink));
+  --wash: light-dark(var(--ink), var(--paper));
 
   --amber: light-dark(var(--amber-300), var(--amber-600));
   --red: light-dark(var(--red-300), var(--red-600));
@@ -154,20 +173,32 @@
   --agent: var(--green);
   --human: var(--blue);
 
-  --shadow-1: 0 0 0 1px rgb(20 20 60 / 0.06), 0 2px 3px -1px rgb(26 60 140 / 0.06),
-    0 3px 12px -4px rgb(26 60 140 / 0.05), 0 4px 16px -8px rgb(26 60 140 / 0.05);
-  --shadow-4: 0 0 0 1px rgb(20 20 60 / 0.08), 0 6px 16px -4px rgb(26 60 140 / 0.12),
-    0 16px 32px -8px rgb(26 60 140 / 0.1), 0 24px 48px -12px rgb(26 60 140 / 0.08);
+  --shadow-1: 0 0 0 1px var(--border), 0 1px 2px oklch(0 0 0 / 0.05), 0 4px 16px oklch(0 0 0 / 0.04);
+  --shadow-4: 0 0 0 1px var(--border), 0 2px 8px oklch(0 0 0 / 0.06), 0 12px 40px oklch(0 0 0 / 0.08);
+  --shadow-float: 0 0 0 0.5px var(--border), 0 1px 8px oklch(0 0 0 / 0.05), 0 24px 60px oklch(0 0 0 / 0.1);
 
   @media (prefers-color-scheme: dark) {
-    --shadow-1: 0 0 0 1px rgb(0 0 0 / 0.12), 0 2px 3px -1px rgb(0 0 0 / 0.12),
-      0 3px 12px -4px rgb(0 0 0 / 0.12), 0 4px 16px -8px rgb(0 0 0 / 0.12),
-      0 0 0 1px rgb(237 234 223 / 0.14);
-    --shadow-4: 0 0 0 1px rgb(0 0 0 / 0.2), 0 6px 16px -4px rgb(0 0 0 / 0.24),
-      0 16px 32px -8px rgb(0 0 0 / 0.2), 0 24px 48px -12px rgb(0 0 0 / 0.16);
+    --shadow-1: 0 0 0 1px var(--border), 0 1px 2px oklch(0 0 0 / 0.3), 0 4px 16px oklch(0 0 0 / 0.25);
+    --shadow-4: 0 0 0 1px var(--border), 0 2px 8px oklch(0 0 0 / 0.35), 0 12px 40px oklch(0 0 0 / 0.35);
+    --shadow-float: 0 0 0 0.5px var(--border), 0 1px 8px oklch(0 0 0 / 0.3), 0 24px 60px oklch(0 0 0 / 0.4);
   }
 }
 
 /* An explicit choice beats the system preference. */
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"]  { color-scheme: dark; }
+:root[data-theme="dark"] {
+  --shadow-1: 0 0 0 1px var(--border), 0 1px 2px oklch(0 0 0 / 0.3), 0 4px 16px oklch(0 0 0 / 0.25);
+  --shadow-4: 0 0 0 1px var(--border), 0 2px 8px oklch(0 0 0 / 0.35), 0 12px 40px oklch(0 0 0 / 0.35);
+  --shadow-float: 0 0 0 0.5px var(--border), 0 1px 8px oklch(0 0 0 / 0.3), 0 24px 60px oklch(0 0 0 / 0.4);
+}
+:root[data-theme="light"] {
+  --shadow-1: 0 0 0 1px var(--border), 0 1px 2px oklch(0 0 0 / 0.05), 0 4px 16px oklch(0 0 0 / 0.04);
+  --shadow-4: 0 0 0 1px var(--border), 0 2px 8px oklch(0 0 0 / 0.06), 0 12px 40px oklch(0 0 0 / 0.08);
+  --shadow-float: 0 0 0 0.5px var(--border), 0 1px 8px oklch(0 0 0 / 0.05), 0 24px 60px oklch(0 0 0 / 0.1);
+}
+
+/* The theme wipes in as a circle from the toggle; see app.js. */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 9999; }

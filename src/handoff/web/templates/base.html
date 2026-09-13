@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Handoff{% endblock %}</title>
   <link rel="icon" href="/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Comfortaa:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/reset.css">
   <link rel="stylesheet" href="/static/ui.css">
@@ -22,9 +25,9 @@
   <div class="app-shell">
     <header class="sidebar">
       <div class="sidebar-header">
-        <a class="brand" href="/">
-          <svg class="icon" aria-hidden="true"><use href="/static/icons.svg#i-mark"/></svg>
-          <h1>Handoff</h1>
+        <a class="brand" href="/" aria-label="Handoff home">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <h1 class="wordmark">handoff</h1>
         </a>
         <button type="button" class="icon-button theme" data-role="theme" aria-label="Switch theme">
           <svg class="icon sm" aria-hidden="true"><use href="/static/icons.svg#i-moon"/></svg>
