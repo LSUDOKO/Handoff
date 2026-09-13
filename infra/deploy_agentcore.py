@@ -72,11 +72,6 @@ def preflight() -> list[str]:
                 "No usable AWS credentials — run `aws configure` or `aws sso login`"
             )
 
-    if which("agentcore") is None:
-        problems.append(
-            "agentcore CLI missing — pip install bedrock-agentcore-starter-toolkit"
-        )
-
     try:
         import bedrock_agentcore  # noqa: F401
     except ImportError:
@@ -122,60 +117,34 @@ def build_and_push() -> str:
     return uri
 
 
-def runtime_env() -> list[str]:
-    """The settings the deployed agent needs that the image must not carry.
+def launch() -> str:
+    """Create or update the Runtime from the pushed image.
 
-    A Runtime container's filesystem is ephemeral, so the local JSON store
-    would lose every run between invocations — the deployment has to be told to
-    use DynamoDB and AgentCore Memory. These are passed at launch rather than
-    baked into the image because the memory id and table name are specific to
-    one account, and an image is a thing you might publish.
+    Delegates to ``infra/agentcore_runtime.py``, which talks to the control
+    plane directly. The Python starter toolkit's ``configure``/``launch`` pair
+    is deprecated, prompts interactively, and reports success while launching
+    nothing when its config file is missing — which is how an earlier version
+    of this script printed "Deployed." over an empty account.
     """
-    settings = {
-        "HANDOFF_MODEL_PROVIDER": "bedrock",
-        "AWS_REGION": config.AWS_REGION,
-        "BEDROCK_MODEL_ID": config.BEDROCK_MODEL_ID,
-        "BEDROCK_FALLBACK_MODEL_ID": config.BEDROCK_FALLBACK_MODEL_ID,
-        "USE_DYNAMODB": str(config.USE_DYNAMODB).lower(),
-        "DDB_TABLE": config.DDB_TABLE,
-        "USE_AGENTCORE_MEMORY": str(config.USE_AGENTCORE_MEMORY).lower(),
-        "AGENTCORE_MEMORY_ID": config.AGENTCORE_MEMORY_ID,
-        "USE_MOCK_TOOLS": str(config.USE_MOCK_TOOLS).lower(),
-    }
-    flags: list[str] = []
-    for key, value in settings.items():
-        if value:
-            flags += ["--env", f"{key}={value}"]
-    return flags
-
-
-def launch() -> None:
     print("\n[4/4] AgentCore Runtime")
-    run(
-        [which("agentcore") or "agentcore", "configure", "--entrypoint", "src/handoff/app.py",
-         "--name", AGENT_NAME, "--region", config.AWS_REGION],
-        check=False,
-    )
-
     if not config.USE_DYNAMODB:
         print(
             "  note: USE_DYNAMODB is false — the deployed agent will keep state on\n"
             "        an ephemeral container filesystem and lose it between calls.\n"
             "        Run infra/dynamodb_setup.py and set USE_DYNAMODB=true."
         )
+    from agentcore_runtime import deploy  # noqa: E402  (sibling script)
 
-    run([which("agentcore") or "agentcore", "launch", *runtime_env()], check=False)
+    return deploy()
 
 
-def invoke() -> None:
+def invoke(arn: str) -> None:
+    from agentcore_runtime import invoke as call
+
     print("\nSmoke test — status:")
-    run([which("agentcore") or "agentcore", "invoke", json.dumps({"type": "status"})], check=False)
+    print(json.dumps(call(arn, {"type": "status"}), indent=2)[:1500])
     print("\nSmoke test — one scheduled run:")
-    run(
-        [which("agentcore") or "agentcore", "invoke",
-         json.dumps({"type": "tick", "workflow_id": "inbox-triage-morning"})],
-        check=False,
-    )
+    print(json.dumps(call(arn, {"type": "tick", "workflow_id": "inbox-triage-morning"}), indent=2)[:1500])
 
 
 def main() -> int:
@@ -201,19 +170,27 @@ def main() -> int:
         return 0
 
     if args.invoke:
-        invoke()
+        import boto3
+        from agentcore_runtime import find_runtime
+
+        existing = find_runtime(
+            boto3.client("bedrock-agentcore-control", region_name=config.AWS_REGION)
+        )
+        if existing is None:
+            print("No runtime to invoke — deploy first.")
+            return 1
+        invoke(existing["agentRuntimeArn"])
         return 0
 
     if not args.skip_build:
         build_and_push()
-    launch()
-    invoke()
+    arn = launch()
+    invoke(arn)
 
     print(
         "\nDeployed. Next:\n"
-        "  1. python infra/memory_setup.py        # AgentCore Memory for learned rules\n"
-        "  2. python infra/dynamodb_setup.py      # durable workflow + audit storage\n"
-        "  3. python infra/eventbridge_setup.py --target-arn <arn> --role-arn <arn>\n"
+        f"  python infra/eventbridge_setup.py --target-arn {arn} \\\n"
+        "      --role-arn $(python infra/iam_setup.py | grep -o 'arn:aws:iam::[^ ]*')\n"
     )
     return 0
 
