@@ -44,6 +44,8 @@ class Workspace(BaseModel):
     name: str
     description: str = ""
     icon: str = "◆"
+    #: Sidebar dot. One of amber, blue, green, red, purple, grey.
+    color: str = "amber"
     is_default: bool = False
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)

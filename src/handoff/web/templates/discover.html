@@ -1,22 +1,21 @@
 {% extends "base.html" %}
-{% block title %}Handoff — Discover{% endblock %}
+{% import "_page.html" as ui %}
+{% block title %}Discover — Handoff{% endblock %}
 {% block body %}
-{% with title="Discover", subtitle="Complete setups you can import and then edit. Better than a blank page." %}{% include "_page_head.html" %}{% endwith %}
-<ul class="cards">
-  {% for t in templates %}
-  <li class="card">
-    <h3><span class="c-icon">{{ t.icon }}</span>{{ t.name }}</h3>
-    <p><strong>{{ t.tagline }}</strong></p>
-    <p>{{ t.description }}</p>
-    <div class="c-foot">
-      <span class="c-tags">{{ t.integrations|join(' · ') }}</span>
-      {% if t.installed %}
-      <span class="pill on" style="margin-left:auto">imported</span>
-      {% else %}
-      <button style="margin-left:auto" hx-post="/discover/{{ t.slug }}/install" hx-target="body" hx-swap="outerHTML">Import</button>
-      {% endif %}
+<div class="page">
+  {{ ui.title("Discover", "Complete setups you can import and then edit. Better than a blank page.") }}
+  <div class="page-body">
+    <div class="grid auto">
+      {% for t in templates %}
+      <div class="card">
+        <div class="row"><span class="provider-mark" style="font-size: var(--font-size-4)">{{ t.icon }}</span><span class="section-title grow">{{ t.name }}</span>{% if t.installed %}{{ ui.status('ok', 'imported') }}{% endif %}</div>
+        <p class="text-bright text-sm">{{ t.tagline }}</p>
+        <p class="text-faded text-xs" style="line-height: var(--lh-3)">{{ t.description }}</p>
+        <div class="row" style="margin-block-start: auto"><span class="tool-list">{% for i in t.integrations %}<span class="pill">{{ i }}</span>{% endfor %}</span>
+          {% if not t.installed %}<button class="button accent small ml-auto" hx-post="/discover/{{ t.slug }}/install" hx-target="body" hx-swap="outerHTML">Import</button>{% endif %}</div>
+      </div>
+      {% endfor %}
     </div>
-  </li>
-  {% endfor %}
-</ul>
+  </div>
+</div>
 {% endblock %}

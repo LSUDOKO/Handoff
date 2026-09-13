@@ -1,0 +1,34 @@
+{# Page layout macros — the equivalent of PageLayout.Title / Body / Aside. #}
+{% macro title(text, subtitle='', crumbs=[]) %}
+<div class="page-title">
+  <h1>
+    {% for c in crumbs %}{% if c.href %}<a class="crumb" href="{{ c.href }}">{{ c.label }}</a>{% else %}<span class="crumb">{{ c.label }}</span>{% endif %}<span class="sep">/</span>{% endfor %}
+    <span>{{ text }}</span>
+  </h1>
+  {% if subtitle %}<p class="subtitle" role="button" tabindex="0">{{ subtitle }}</p>{% endif %}
+  {% if caller %}<div class="actions">{{ caller() }}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro icon(name, cls='') %}<svg class="icon {{ cls }}" aria-hidden="true"><use href="/static/icons.svg#{{ name }}"/></svg>{% endmacro %}
+
+{% macro status(value, label='') %}<span class="status-badge {{ value }}">{{ label or value|replace('_',' ') }}</span>{% endmacro %}
+
+{% macro empty(heading, body='', href='', cta='') %}
+<div class="empty">
+  <h2>{{ heading }}</h2>
+  {% if body %}<p>{{ body }}</p>{% endif %}
+  {% if href %}<div class="actions"><a class="button primary" href="{{ href }}">{{ cta or 'Get started' }}</a></div>{% endif %}
+  {% if caller %}{{ caller() }}{% endif %}
+</div>
+{% endmacro %}
+
+{% macro data(label, text, variant='') %}
+<div class="data {{ variant }}">
+  {% if label %}<div class="data-label">{{ label }}</div>{% endif %}
+  <button type="button" class="button small secondary copy" data-copy>Copy</button>
+  <pre>{{ text }}</pre>
+</div>
+{% endmacro %}
+
+{% macro ago(when) %}{% if when %}<time datetime="{{ when.isoformat() if when.isoformat is defined else when }}" data-rel title="{{ when }}">{{ when }}</time>{% endif %}{% endmacro %}

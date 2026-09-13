@@ -1,8 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Handoff — {{ payload.item.subject or 'Decision' }}{% endblock %}
+{% block title %}{{ payload.item.subject or 'Decision' }} — Handoff{% endblock %}
 {% block chrome %}{% endblock %}
 {% block bare %}
-<main class="decision" id="decision">
-  {% include "_decision_body.html" %}
-</main>
+<div class="decision-page">
+  <main class="decision" id="decision">
+    {% include "_decision_body.html" %}
+  </main>
+</div>
 {% endblock %}

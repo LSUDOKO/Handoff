@@ -1,45 +1,83 @@
 {% extends "base.html" %}
-{% block title %}Handoff — Session {{ run.run_id }}{% endblock %}
+{% import "_page.html" as ui %}
+{% block title %}Run {{ run.run_id }} — Handoff{% endblock %}
 {% block body %}
-{% with title="Session", subtitle=run.summary, actions='<a class="button" href="/inspector">All sessions</a> <a class="button" href="/trace/'+run.run_id+'">Audit view</a>' %}{% include "_page_head.html" %}{% endwith %}
-
-<section class="stat-strip">
-  <div><span class="v done">{{ run.auto_count }}</span><span class="k">handled alone</span></div>
-  <div><span class="v">{{ run.interrupt_count }}</span><span class="k">you decided</span></div>
-  <div><span class="v">{{ run.memory_count }}</span><span class="k">from rules</span></div>
-  <div><span class="v">{{ session.model_calls if session else 0 }}</span><span class="k">model calls</span></div>
-  <div><span class="v">{{ session.tool_calls if session else 0 }}</span><span class="k">tool calls</span></div>
-  <div><span class="v mono" style="font-size:1rem">{{ run.run_id }}</span><span class="k">run</span></div>
-</section>
-
-{% if steps %}
-<ol class="steps">
-  {% for step in steps %}
-  <li class="step-{{ step.status }}">
-    <span class="step-n">{{ step.index }}</span>
-    <div>
-      <div class="step-head">
-        <span class="step-kind {{ step.kind }}">{{ step.kind }}</span>
-        <span class="step-name">{{ step.name }}</span>
-        {% if step.node %}<span class="step-node">{{ step.node }}</span>{% endif %}
-        {% if step.gated %}<span class="pill warn">gated</span>{% endif %}
-        {% if step.duration_ms %}<span class="step-ms">{{ step.duration_ms }}ms</span>{% endif %}
-      </div>
-      <div class="step-body">
-        {% if step.input %}
-        <span class="lbl">input</span>
-        <pre>{{ step.input_pretty }}</pre>
+<div class="page with-aside">
+  <div>
+    {% call ui.title(run.workflow_name or run.run_id, run.summary, [{"label": "Runs", "href": "/inspector"}]) %}
+      <a class="button secondary small" href="/trace/{{ run.run_id }}">Audit view</a>
+      {% if run.status == 'waiting_on_human' %}<a class="button needs small" href="/activity#waiting">Needs you</a>{% endif %}
+    {% endcall %}
+    <div class="page-body">
+      <div class="stack" style="gap: var(--size-8)">
+        {% if waterfall %}
+        <section class="stack">
+          <div class="section-head"><h2 class="section-title">Timeline</h2><span class="section-count">{{ waterfall.total_ms }} ms · {{ steps|length }} steps</span></div>
+          <div class="waterfall card flat" style="padding: 0">
+            <div class="wf-head"><span>step</span><div class="ticks">{% for t in waterfall.ticks %}<span class="tick" style="left: {{ t.pct }}%">{{ t.label }}</span>{% endfor %}</div><span style="text-align:end">ms</span></div>
+            {% for s in waterfall.rows %}
+            <a class="wf-row {{ 'failed' if s.status == 'error' else '' }} {{ 'gated' if s.gated else '' }}" href="#step-{{ s.index }}">
+              <span class="label"><span class="kind">{{ s.kind }}</span>{{ s.name }}</span>
+              <span class="track"><span class="bar {{ s.kind }} {{ 'error' if s.status == 'error' else '' }} {{ 'gated' if s.gated else '' }}" style="left: {{ s.left }}%; width: {{ s.width }}%"></span></span>
+              <span class="dur">{{ s.duration_ms }}</span>
+            </a>
+            {% endfor %}
+          </div>
+        </section>
         {% endif %}
-        {% if step.output %}
-        <span class="lbl">{{ 'result' if step.kind == 'tool' else 'said' }}</span>
-        <pre>{{ step.output }}</pre>
-        {% endif %}
+
+        <section class="stack">
+          <div class="section-head"><h2 class="section-title">Step by step</h2></div>
+          {% if blocks %}
+          <div class="timeline">
+            {% for b in blocks %}
+            <details class="step-block" {% if loop.last or b.status != 'ok' or b.gated %}open{% endif %}>
+              <summary class="step-head">
+                <span class="step-icon {{ 'failed' if b.status == 'error' else ('gated' if b.gated else 'ok') }}">{{ ui.icon('i-dot','sm') }}</span>
+                <div class="step-title"><h2>{{ b.node|replace('_',' ')|capitalize }} {{ ui.icon('i-caret-right','xs caret') }}</h2>
+                  <p>{{ b.steps|length }} steps · {{ b.duration_ms }} ms{% if b.gated %} · stopped at the gate{% endif %}{% if b.status == 'error' %} · failed{% endif %}</p></div>
+              </summary>
+              <div class="step-body">
+                {% for step in b.steps %}
+                <div class="detail-section" id="step-{{ step.index }}">
+                  <h3 class="row"><span class="badge {{ 'status' if step.kind == 'model' else 'success' }}">{{ step.kind }}</span> <span class="mono text-bright">{{ step.name }}</span>
+                    {% if step.gated %}<span class="badge needs">gated</span>{% endif %}{% if step.status == 'error' %}<span class="badge error">error</span>{% endif %}{% if step.status == 'cancelled' %}<span class="badge neutral">cancelled</span>{% endif %}
+                    <span class="ml-auto text-faded" style="text-transform:none;letter-spacing:0">{{ step.duration_ms }} ms</span></h3>
+                  {% if step.input_pretty %}{{ ui.data('input', step.input_pretty) }}{% endif %}
+                  {% if step.output %}{{ ui.data('result' if step.kind == 'tool' else 'said', step.output, 'error' if step.status == 'error' else '') }}{% endif %}
+                </div>
+                {% endfor %}
+              </div>
+            </details>
+            {% endfor %}
+            <div class="step-block">
+              <div class="step-head"><span class="step-icon {{ 'failed' if run.status == 'failed' else ('gated' if run.status == 'waiting_on_human' else 'ok') }}">{{ ui.icon('i-dot','sm') }}</span>
+                <div class="step-title"><h2>{{ {'completed':'Complete','failed':'Failed','waiting_on_human':'Waiting on you','running':'Running'}.get(run.status, run.status) }}</h2><p>{{ run.summary }}</p></div></div>
+            </div>
+          </div>
+          {% else %}
+          {{ ui.empty("No step trace for this run", "Sessions are recorded from the moment the recorder was added — older runs only have the audit view.", "/trace/" ~ run.run_id, "Open audit view") }}
+          {% endif %}
+        </section>
       </div>
     </div>
-  </li>
-  {% endfor %}
-</ol>
-{% else %}
-<p class="empty-state">No step trace for this run.<br>Sessions are recorded from the moment the recorder was added — older runs only have the audit view.</p>
-{% endif %}
+  </div>
+  <aside class="page-aside">
+    <div class="aside-section"><h3>Run</h3><dl class="kv">
+      <dt>Status</dt><dd>{{ ui.status(run.status) }}</dd>
+      <dt>Run id</dt><dd class="mono">{{ run.run_id }}</dd>
+      <dt>Workflow</dt><dd>{{ run.workflow_name or run.workflow_id }}</dd>
+      {% if run.started %}<dt>Started</dt><dd>{{ run.started }}</dd>{% endif %}
+      {% if run.duration %}<dt>Duration</dt><dd>{{ run.duration }}</dd>{% endif %}
+    </dl></div>
+    <div class="aside-section"><h3>Counters</h3><dl class="kv">
+      <dt>Handled alone</dt><dd><b class="text-bright">{{ run.auto_count }}</b></dd>
+      <dt>You decided</dt><dd><b class="text-bright">{{ run.interrupt_count }}</b></dd>
+      <dt>From rules</dt><dd><b class="text-bright">{{ run.memory_count }}</b></dd>
+      <dt>Model calls</dt><dd>{{ session.model_calls if session else 0 }}</dd>
+      <dt>Tool calls</dt><dd>{{ session.tool_calls if session else 0 }}</dd>
+    </dl></div>
+    {% if usage %}<div class="aside-section"><h3>Usage</h3><dl class="kv"><dt>Tokens</dt><dd>{{ '{:,}'.format(usage.tokens) }}</dd><dt>Cost</dt><dd>${{ '%.4f'|format(usage.cost) }}</dd><dt>Model</dt><dd class="mono">{{ usage.model }}</dd></dl></div>{% endif %}
+  </aside>
+</div>
 {% endblock %}

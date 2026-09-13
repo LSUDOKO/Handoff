@@ -1,44 +1,35 @@
 {% extends "base.html" %}
-{% block title %}Handoff — {{ agent.name }}{% endblock %}
+{% import "_page.html" as ui %}
+{% block title %}{{ agent.name }} — Handoff{% endblock %}
 {% block body %}
-{% with title=agent.name, subtitle=agent.description, actions='<a class="button" href="/agents">All agents</a>' %}{% include "_page_head.html" %}{% endwith %}
-
-<form class="form-grid" hx-post="/agents/save" hx-target="body" hx-swap="outerHTML">
-  <input type="hidden" name="agent_id" value="{{ agent.agent_id }}">
-  <div class="field-row">
-    <div class="field"><label for="e-name">Name</label>
-      <input id="e-name" name="name" value="{{ agent.name }}" required {% if agent.builtin %}readonly{% endif %}></div>
-    <div class="field"><label for="e-model">Model override</label>
-      <input id="e-model" name="model_override" value="{{ agent.model_override }}" placeholder="(workspace default)"></div>
+<div class="page with-aside">
+  <div>
+    {% call ui.title(agent.name, agent.description, [{"label": "Agents", "href": "/agents"}]) %}
+      {% if not agent.builtin %}<button class="button destructive small" hx-post="/agents/{{ agent.agent_id }}/delete" hx-target="body" hx-swap="outerHTML" hx-confirm="Delete {{ agent.name }}?">Delete</button>{% endif %}
+    {% endcall %}
+    <div class="page-body">
+      <form class="stack" style="gap: var(--size-4)" hx-post="/agents/save" hx-target="body" hx-swap="outerHTML">
+        <input type="hidden" name="agent_id" value="{{ agent.agent_id }}">
+        <div class="field-row">
+          <label class="field"><span>Name</span><input name="name" value="{{ agent.name }}" required {% if agent.builtin %}readonly{% endif %}></label>
+          <label class="field"><span>Model override</span><input name="model_override" value="{{ agent.model_override }}" placeholder="(workspace default)"></label>
+        </div>
+        <label class="field"><span>Description</span><input name="description" value="{{ agent.description }}"></label>
+        <label class="field"><span>System prompt</span><textarea name="system_prompt" style="min-block-size: var(--size-56)">{{ agent.system_prompt }}</textarea></label>
+        <div class="field"><span>Tools</span><div class="checks">{% for name, purpose in available_tools.items() %}<label><input type="checkbox" name="tools" value="{{ name }}" {% if name in agent.tools %}checked{% endif %}><span><code class="mono">{{ name }}</code><br><span class="t">{{ purpose }}</span></span></label>{% endfor %}</div></div>
+        {% if skills %}<div class="field"><span>Skills</span><div class="checks">{% for s in skills %}<label><input type="checkbox" name="skills" value="{{ s.skill_id }}" {% if s.skill_id in agent.skills %}checked{% endif %}><span>{{ s.name }}<br><span class="t">{{ s.description[:70] }}</span></span></label>{% endfor %}</div></div>{% endif %}
+        <div class="form-actions"><button class="button accent" type="submit">Save changes</button></div>
+      </form>
+      <details class="stack" style="margin-block-start: var(--size-8)" open>
+        <summary class="section-title">Resolved system prompt</summary>
+        <p class="text-faded text-xs" style="margin-block: var(--size-1) var(--size-2)">What this agent actually receives, once its skills are folded in.</p>
+        {{ ui.data('', resolved_prompt) }}
+      </details>
+    </div>
   </div>
-  <div class="field"><label for="e-desc">Description</label>
-    <input id="e-desc" name="description" value="{{ agent.description }}"></div>
-  <div class="field"><label for="e-prompt">System prompt</label>
-    <textarea id="e-prompt" name="system_prompt" style="min-height:14rem">{{ agent.system_prompt }}</textarea></div>
-  <div class="field"><label>Tools</label>
-    <div class="checks">
-      {% for name, purpose in available_tools.items() %}
-      <label><input type="checkbox" name="tools" value="{{ name }}" {% if name in agent.tools %}checked{% endif %}>
-        <span><code class="mono">{{ name }}</code><br><span class="t">{{ purpose }}</span></span></label>
-      {% endfor %}
-    </div></div>
-  {% if skills %}
-  <div class="field"><label>Skills</label>
-    <div class="checks">
-      {% for s in skills %}
-      <label><input type="checkbox" name="skills" value="{{ s.skill_id }}" {% if s.skill_id in agent.skills %}checked{% endif %}>
-        <span>{{ s.name }}<br><span class="t">{{ s.description[:70] }}</span></span></label>
-      {% endfor %}
-    </div></div>
-  {% endif %}
-  <div class="page-actions"><button type="submit">Save changes</button></div>
-</form>
-
-<details class="panel" style="margin-top:2rem">
-  <summary>Resolved system prompt</summary>
-  <div class="panel-body">
-    <p class="page-sub">What this agent actually receives, once its skills are folded in.</p>
-    <pre class="mono" style="white-space:pre-wrap;background:var(--paper-raised);border:1px solid var(--rule);border-radius:3px;padding:1rem;max-height:24rem;overflow:auto">{{ resolved_prompt }}</pre>
-  </div>
-</details>
+  <aside class="page-aside">
+    <div class="aside-section"><h3>Agent</h3><dl class="kv"><dt>Id</dt><dd class="mono">{{ agent.agent_id }}</dd><dt>Kind</dt><dd>{{ 'built-in' if agent.builtin else 'custom' }}</dd><dt>Tools</dt><dd>{{ agent.tools|length }}</dd><dt>Skills</dt><dd>{{ agent.skills|length }}</dd></dl></div>
+    <div class="aside-section"><h3>Runtime</h3><dl class="kv"><dt>Provider</dt><dd>{{ settings.provider }}</dd><dt>Model</dt><dd class="mono">{{ agent.model_override or settings.model_id }}</dd></dl></div>
+  </aside>
+</div>
 {% endblock %}

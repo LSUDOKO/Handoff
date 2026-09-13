@@ -28,3 +28,7 @@ node_modules/
 
 # Third-party reference checkout — BUSL-1.1, never redistribute from here
 friday-studio/
+
+# Screenshot scratch from Playwright MCP
+.playwright-mcp/
+/*.png

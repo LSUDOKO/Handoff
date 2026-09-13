@@ -1,23 +1,29 @@
 {% extends "base.html" %}
-{% block title %}Handoff — Sessions{% endblock %}
+{% import "_page.html" as ui %}
+{% block title %}Runs — Handoff{% endblock %}
 {% block body %}
-{% with title="Sessions", subtitle="The audit log says what it did. This says why." %}{% include "_page_head.html" %}{% endwith %}
-{% if sessions %}
-<ul class="rows">
-  {% for s in sessions %}
-  <li>
-    <span class="r-name">{{ s.workflow_name }}
-      {% if s.status == 'completed' %}<span class="pill on">done</span>
-      {% elif s.status == 'waiting_on_human' %}<span class="pill warn">needs you</span>
-      {% elif s.status == 'failed' %}<span class="pill warn">failed</span>{% endif %}
-    </span>
-    <span class="r-desc">{{ s.summary or 'No summary.' }}</span>
-    <span class="r-meta">{{ s.started }} · {{ s.model_calls }} model calls · {{ s.tool_calls }} tool calls{% if s.duration %} · {{ s.duration }}{% endif %}</span>
-    <span class="r-actions"><a class="button" href="/inspector/{{ s.run_id }}">Inspect</a></span>
-  </li>
-  {% endfor %}
-</ul>
-{% else %}
-<p class="empty-state">No sessions yet. Run a workflow and its full trace lands here.</p>
-{% endif %}
+<div class="page">
+  {{ ui.title("Runs", "Every run, step by step. The audit log says what it did; this says why.") }}
+  <div class="page-body">
+    {% if sessions %}
+    <div class="table-wrap"><table class="table run-list">
+      <thead><tr><th>Workflow</th><th>Status</th><th>Summary</th><th class="num">Model</th><th class="num">Tools</th><th>Started</th><th></th></tr></thead>
+      <tbody>
+        {% for s in sessions %}
+        <tr>
+          <td><a class="text-bright" href="/inspector/{{ s.run_id }}"><b>{{ s.workflow_name }}</b></a><div class="text-faded text-2xs mono">{{ s.run_id }}</div></td>
+          <td>{{ ui.status(s.status) }}</td>
+          <td class="text-faded" style="max-inline-size: 42ch">{{ s.summary or '—' }}</td>
+          <td class="num">{{ s.model_calls }}</td><td class="num">{{ s.tool_calls }}</td>
+          <td class="text-faded" style="white-space:nowrap">{{ s.started }}{% if s.duration %} · {{ s.duration }}{% endif %}</td>
+          <td><a class="button secondary small" href="/inspector/{{ s.run_id }}">Inspect</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}
+    {{ ui.empty("No runs yet", "Run a workflow and its full trace — every model turn and tool call — lands here.", "/platform", "Go to workflows") }}
+    {% endif %}
+  </div>
+</div>
 {% endblock %}

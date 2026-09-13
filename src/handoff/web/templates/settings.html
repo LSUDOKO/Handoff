@@ -1,53 +1,58 @@
 {% extends "base.html" %}
-{% block title %}Handoff — Settings{% endblock %}
+{% import "_page.html" as ui %}
+{% block title %}Settings — Handoff{% endblock %}
 {% block body %}
-{% with title="Settings", subtitle="How this installation behaves." %}{% include "_page_head.html" %}{% endwith %}
+<div class="page">
+  {{ ui.title("Settings", "How this installation behaves.") }}
+  <div class="page-body narrow">
+    <div class="stack" style="gap: var(--size-8)">
+      {% if flash %}<div class="callout {{ 'error' if flash_kind == 'error' else '' }}">{{ flash }}</div>{% endif %}
 
-{% if flash %}<div class="flash {{ flash_kind }}">{{ flash }}</div>{% endif %}
+      <section class="card">
+        <header class="section-head"><h2 class="section-title">Models</h2><span class="section-count">primary → fallback</span></header>
+        <div class="model-chain">
+          <span class="model-slot"><span class="prov provider-mark" style="inline-size:18px;block-size:18px;font-size:10px">{{ settings.provider[:1]|upper }}</span><span class="role">primary</span>{{ settings.model_id }}</span>
+          <span class="chain-arrow">→</span>
+          <span class="model-slot fallback"><span class="role">fallback</span>{{ settings.fallback_model_id }}</span>
+        </div>
+        <p class="text-faded text-xs">Provider and model ids come from <code class="mono">.env</code> (<code class="mono">HANDOFF_MODEL_PROVIDER</code>, <code class="mono">BEDROCK_MODEL_ID</code>, …). Connect a key on <a class="text-bright" href="/credentials">Credentials</a>; Bedrock ids resolve to the right regional inference profile automatically.</p>
+      </section>
 
-<section class="block">
-  <h2>The gate</h2>
-  <form class="form-grid" hx-post="/settings/save" hx-target="body" hx-swap="outerHTML">
-    <div class="field">
-      <label for="thr">Confidence threshold — {{ (settings.confidence_threshold*100)|round|int }}%</label>
-      <span class="help">Below this, it stops and asks instead of acting. Raise it to be asked more often while you're still deciding whether to trust it; lower it once the learned rules have built up.</span>
-      <input id="thr" name="confidence_threshold" type="range" min="0.3" max="0.95" step="0.05"
-             value="{{ settings.confidence_threshold }}"
-             oninput="this.previousElementSibling.previousElementSibling.textContent='Confidence threshold — '+Math.round(this.value*100)+'%'">
+      <section class="card">
+        <header class="section-head"><h2 class="section-title">The gate</h2></header>
+        <form class="stack" hx-post="/settings/save" hx-target="body" hx-swap="outerHTML">
+          <label class="field"><span id="thr-label">Confidence threshold — {{ (settings.confidence_threshold*100)|round|int }}%</span>
+            <span class="help">Below this, it stops and asks instead of acting. Raise it to be asked more often while you're still deciding whether to trust it; lower it once the learned rules have built up.</span>
+            <input name="confidence_threshold" type="range" min="0.3" max="0.95" step="0.05" value="{{ settings.confidence_threshold }}" oninput="document.getElementById('thr-label').textContent='Confidence threshold — '+Math.round(this.value*100)+'%'"></label>
+          <div class="form-actions"><button class="button accent" type="submit">Save</button></div>
+        </form>
+      </section>
+
+      <section class="card">
+        <header class="section-head"><h2 class="section-title">Runtime</h2></header>
+        <dl class="kv">
+          <dt>Tools</dt><dd>{{ 'synthetic inbox' if settings.use_mock_tools else 'live integrations' }}</dd>
+          <dt>Storage</dt><dd>{{ 'DynamoDB' if settings.use_dynamodb else 'local JSON' }} <span class="text-faded mono">{{ settings.state_dir }}</span></dd>
+          <dt>Memory</dt><dd>{{ 'AgentCore Memory' if settings.use_agentcore_memory else 'local' }}</dd>
+          <dt>Region</dt><dd class="mono">{{ settings.aws_region }}</dd>
+          <dt>Notifications</dt><dd>{{ settings.notify_channel }}</dd>
+          <dt>Tracing</dt><dd>{{ 'OTEL → ' + settings.otel_exporter if settings.otel_enabled else 'off' }}</dd>
+          <dt>Scheduler</dt><dd>{{ 'running, checks every ' ~ scheduler.tick_seconds ~ 's' if scheduler.running else 'idle' }}</dd>
+          <dt>Voice</dt><dd>{{ 'Whisper + Orpheus' if voice_enabled else 'browser speech only' }}</dd>
+        </dl>
+      </section>
+
+      <section class="card" id="import">
+        <header class="section-head"><h2 class="section-title">Workspaces</h2></header>
+        <div class="rows">
+          {% for w in workspaces %}
+          <div class="row-item"><span class="ws-dot" data-color="{{ w.color }}"></span><a class="primary grow" href="/platform/{{ w.workspace_id }}">{{ w.name }}</a>{% if w.is_default %}<span class="pill">default</span>{% endif %}<span class="meta">{{ w.description }}</span></div>
+          {% endfor %}
+        </div>
+        <div class="row"><button class="button primary small" data-dialog="#add-workspace">{{ ui.icon('i-plus','sm') }} New workspace</button><a class="button secondary small" href="/workspace/export">{{ ui.icon('i-download','sm') }} Export current</a></div>
+        <p class="text-faded text-xs">Separate workspaces keep learned rules and credentials apart — a rule you set for your own mail should not start acting on a shared account.</p>
+      </section>
     </div>
-    <div><button type="submit">Save</button></div>
-  </form>
-</section>
-
-<section class="block">
-  <h2>Runtime</h2>
-  <table class="grid-table">
-    <tbody>
-      <tr><td>Model provider</td><td class="mono">{{ settings.provider }}</td></tr>
-      <tr><td>Model</td><td class="mono">{{ settings.model_id }}</td></tr>
-      <tr><td>Tools</td><td class="mono">{{ 'synthetic inbox' if settings.use_mock_tools else 'live integrations' }}</td></tr>
-      <tr><td>Storage</td><td class="mono">{{ 'DynamoDB' if settings.use_dynamodb else 'local JSON' }} · {{ settings.state_dir }}</td></tr>
-      <tr><td>Memory</td><td class="mono">{{ 'AgentCore Memory' if settings.use_agentcore_memory else 'local' }}</td></tr>
-      <tr><td>Notifications</td><td class="mono">{{ settings.notify_channel }}</td></tr>
-      <tr><td>Tracing</td><td class="mono">{{ 'OTEL → ' + settings.otel_exporter if settings.otel_enabled else 'off' }}</td></tr>
-      <tr><td>Scheduler</td><td class="mono">{{ 'running, checks every ' ~ scheduler.tick_seconds ~ 's' if scheduler.running else 'idle' }}</td></tr>
-      <tr><td>Voice</td><td class="mono">{{ 'Whisper + Orpheus' if voice_enabled else 'browser speech only' }}</td></tr>
-    </tbody>
-  </table>
-  <p class="page-sub" style="margin-top:1rem">These come from <code class="mono">.env</code>. Change them there and restart, or connect a provider on the <a href="/credentials">Credentials</a> page.</p>
-</section>
-
-<section class="block">
-  <h2>Workspace</h2>
-  <form class="form-grid" hx-post="/workspace/create" hx-target="body" hx-swap="outerHTML">
-    <div class="field-row">
-      <div class="field"><label for="w-name">New workspace</label><input id="w-name" name="name" required placeholder="Team on-call"></div>
-      <div class="field"><label for="w-icon">Icon</label><input id="w-icon" name="icon" value="◆" maxlength="2"></div>
-    </div>
-    <div class="field"><label for="w-desc">Description</label><input id="w-desc" name="description" placeholder="What this workspace is for."></div>
-    <div><button type="submit">Create workspace</button></div>
-  </form>
-  <p class="page-sub" style="margin-top:1rem">Separate workspaces keep learned rules and credentials apart — a rule you set for your own mail should not start acting on a shared account.</p>
-  <p style="margin-top:.75rem"><a class="button" href="/workspace/export">Export this workspace</a></p>
-</section>
+  </div>
+</div>
 {% endblock %}

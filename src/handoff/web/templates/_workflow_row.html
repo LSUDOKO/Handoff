@@ -1,28 +1,18 @@
-<li id="flow-{{ flow.workflow_id }}">
-  <span class="name">{{ flow.name }}</span>
-  <span class="desc">{{ flow.run_summary }}</span>
-  <span class="meta">
-    {{ flow.schedule_readable }}
-    {% if flow.mcp_tools %}&nbsp;&nbsp;{{ flow.mcp_tools|join(' ') }}{% endif %}
-    {% if flow.last_run %}&nbsp;&nbsp;last run {{ flow.last_run }}{% endif %}
-  </span>
+{% import "_page.html" as ui %}
+<li class="row-item flow-row {% if flow.live_run_id %}with-live{% endif %}" id="flow-{{ flow.workflow_id }}">
+  <div class="stack grow" style="gap: 2px">
+    <span class="row"><a class="primary" href="/platform/{{ workspace.workspace_id }}/workflows#{{ flow.workflow_id }}">{{ flow.name }}</a>
+      {% if flow.pending_count %}<span class="badge needs">{{ flow.pending_count }} need{% if flow.pending_count == 1 %}s{% endif %} you</span>{% else %}<span class="status-badge {{ 'active-ws' if flow.status == 'active' else flow.status }}">{{ flow.status }}</span>{% endif %}
+    </span>
+    <span class="secondary truncate">{{ flow.run_summary }}</span>
+    <span class="meta row">{{ flow.schedule_readable }}{% if flow.last_run %} · last run {{ flow.last_run }}{% endif %}
+      {% if flow.mcp_tools %}<span class="tools">{% for t in flow.mcp_tools %}<span class="pill mono">{{ t }}</span>{% endfor %}</span>{% endif %}</span>
+  </div>
   <span class="controls">
-    {% if flow.pending_count %}
-    <a class="button needs" href="/#waiting">{{ flow.pending_count }} need{% if flow.pending_count == 1 %}s{% endif %} you</a>
-    {% else %}
-    <span class="state {{ flow.status }}">{{ flow.status }}</span>
-    {% endif %}
-    <button hx-post="/workflow/{{ flow.workflow_id }}/run"
-            hx-target="#flow-{{ flow.workflow_id }}"
-            hx-swap="outerHTML"
-            hx-disabled-elt="this">Run again</button>
-    {% if flow.last_run_id %}
-    <a class="button" href="/trace/{{ flow.last_run_id }}">Trace</a>
-    {% endif %}
+    <button class="button primary small" hx-post="/workflow/{{ flow.workflow_id }}/run" hx-target="#flow-{{ flow.workflow_id }}" hx-swap="outerHTML" hx-disabled-elt="this">{{ ui.icon('i-play','sm') }} Run now</button>
+    {% if flow.last_run_id %}<a class="button secondary small" href="/inspector/{{ flow.last_run_id }}">Inspect</a>{% endif %}
   </span>
   {% if flow.live_run_id %}
-  <div class="row-live">
-    {% with run_id=flow.live_run_id, history=[] %}{% include "_live.html" %}{% endwith %}
-  </div>
+  <div class="row-live">{% with run_id=flow.live_run_id, history=[] %}{% include "_live.html" %}{% endwith %}</div>
   {% endif %}
 </li>

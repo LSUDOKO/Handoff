@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% import "_page.html" as ui %}
+{% block title %}Workflows — Handoff{% endblock %}
+{% block body %}
+<div class="page">
+  {% call ui.title("Workflows", "What runs, when it runs, and where the human line sits.", [{"label": workspace.name, "href": "/platform/" ~ workspace.workspace_id}]) %}
+    <a class="button primary small" href="/chat">{{ ui.icon('i-chat','sm') }} Build one</a>
+    <a class="button secondary small" href="/discover">Import</a>
+  {% endcall %}
+  <div class="page-body">
+    {% if workflows %}
+    <ul class="rows">{% for flow in workflows %}{% include "_workflow_row.html" %}{% endfor %}</ul>
+    {% else %}
+    {{ ui.empty("No workflows in this workspace", "Start from a template, or describe one in chat.", "/discover", "Browse templates") }}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

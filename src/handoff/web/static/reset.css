@@ -1,0 +1,29 @@
+/* Copyright 2026 The Handoff Authors — SPDX-License-Identifier: Apache-2.0
+ * Preflight. Removes the user-agent opinions so the design system is the only
+ * one in the room. */
+*, ::before, ::after { box-sizing: border-box; border: 0 solid currentColor; }
+html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; tab-size: 4;
+  font-family: var(--font-sans); line-height: 1.5; font-feature-settings: normal; }
+body { margin: 0; line-height: inherit; }
+h1, h2, h3, h4, h5, h6 { font-size: inherit; font-weight: inherit; margin: 0; }
+p, blockquote, dl, dd, figure, hr, pre, ol, ul, menu, fieldset { margin: 0; }
+ol, ul, menu, fieldset, legend, dialog { padding: 0; }
+ol, ul, menu { list-style: none; }
+a { color: inherit; text-decoration: inherit; }
+b, strong { font-weight: 600; }
+code, kbd, pre, samp { font-family: var(--font-mono); font-size: 1em; }
+small { font-size: 80%; }
+table { border-collapse: collapse; border-color: inherit; text-indent: 0; }
+button, input, optgroup, select, textarea { color: inherit; font: inherit; letter-spacing: inherit;
+  margin: 0; padding: 0; }
+button, select { text-transform: none; }
+button, [type="button"], [type="reset"], [type="submit"] { -webkit-appearance: button;
+  background-color: transparent; background-image: none; cursor: pointer; }
+textarea { resize: vertical; }
+input::placeholder, textarea::placeholder { color: var(--text-faded); opacity: 1; }
+:disabled { cursor: default; }
+img, svg, video, canvas, iframe, object { display: block; vertical-align: middle; }
+img, video { max-width: 100%; height: auto; }
+[hidden] { display: none !important; }
+summary { display: list-item; }
+hr { height: 0; border-top-width: 1px; color: inherit; }

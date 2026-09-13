@@ -1,28 +1,32 @@
 {% extends "base.html" %}
-{% block title %}Handoff — Run {{ run.run_id }}{% endblock %}
+{% import "_page.html" as ui %}
+{% block title %}Audit {{ run.run_id }} — Handoff{% endblock %}
 {% block body %}
-{% with title="Audit trail", subtitle=run.summary, actions='<a class="button" href="/inspector/'+run.run_id+'">Step trace</a> <a class="button" href="/">Activity</a>' %}{% include "_page_head.html" %}{% endwith %}
-
-<section class="stat-strip">
-  <div><span class="v done">{{ run.auto_count }}</span><span class="k">handled on its own</span></div>
-  <div><span class="v">{{ run.interrupt_count }}</span><span class="k">you decided</span></div>
-  <div><span class="v">{{ run.memory_count }}</span><span class="k">from rules you set</span></div>
-  <div><span class="v {% if run.status == 'waiting_on_human' %}needs{% endif %}" style="font-size:1rem">{{ status_label }}</span><span class="k mono">{{ run.run_id }}</span></div>
-</section>
-
-<section class="block">
-  <h2>Step by step <span class="count">{{ steps|length }} entries</span></h2>
-  <ul class="trace">
-    {% for step in steps %}
-    <li>
-      <span class="at">{{ step.at }}</span>
-      <span>
-        <span class="what">{{ step.action }}</span>
-        <span class="by {{ step.decision_by }}" style="margin-left:.6rem">{{ step.decided_label }}</span>
-        <div class="detail">{% if step.item_id %}<code>{{ step.item_id }}</code> — {% endif %}{{ step.detail }}</div>
-      </span>
-    </li>
-    {% endfor %}
-  </ul>
-</section>
+<div class="page">
+  {% call ui.title("Audit trail", run.summary, [{"label": "Runs", "href": "/inspector"}, {"label": run.run_id, "href": "/inspector/" ~ run.run_id}]) %}
+    <a class="button secondary small" href="/inspector/{{ run.run_id }}">Step trace</a>
+  {% endcall %}
+  <div class="page-body">
+    <div class="stack" style="gap: var(--size-8)">
+      <section class="stat-strip">
+        <div class="stat"><span class="v done">{{ run.auto_count }}</span><span class="k">handled on its own</span></div>
+        <div class="stat"><span class="v">{{ run.interrupt_count }}</span><span class="k">you decided</span></div>
+        <div class="stat"><span class="v">{{ run.memory_count }}</span><span class="k">from rules you set</span></div>
+        <div class="stat"><span class="v" style="font-size: var(--font-size-5)">{{ ui.status(run.status, status_label) }}</span><span class="k mono">{{ run.run_id }}</span></div>
+      </section>
+      <section class="stack">
+        <div class="section-head"><h2 class="section-title">Every action, attributed</h2><span class="section-count">{{ steps|length }} entries</span></div>
+        <div class="timeline">
+          {% for step in steps %}
+          <div class="step-block">
+            <div class="step-head"><span class="step-icon {{ 'ok' if step.decision_by == 'agent' else ('gated' if step.decision_by == 'human' else '') }}">{{ ui.icon('i-dot','sm') }}</span>
+              <div class="step-title"><h2>{{ step.action|capitalize }} <span class="by {{ step.decision_by }}">{{ step.decided_label }}</span></h2>
+                <p><span class="mono">{{ step.at }}</span>{% if step.item_id %} · <span class="mono">{{ step.item_id }}</span>{% endif %}{% if step.detail %} — {{ step.detail }}{% endif %}</p></div></div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
 {% endblock %}

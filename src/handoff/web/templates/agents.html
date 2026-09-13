@@ -1,67 +1,44 @@
 {% extends "base.html" %}
-{% block title %}Handoff — Agents{% endblock %}
+{% import "_page.html" as ui %}
+{% block title %}Agents — Handoff{% endblock %}
 {% block body %}
-{% with title="Agents", subtitle="Handoff ships three with opinions baked in. This is for the fourth one you need." %}{% include "_page_head.html" %}{% endwith %}
-
-<details class="panel" {% if not agents %}open{% endif %}>
-  <summary>New agent</summary>
-  <div class="panel-body">
-    <form class="form-grid" hx-post="/agents/save" hx-target="body" hx-swap="outerHTML">
-      <div class="field-row">
-        <div class="field"><label for="a-name">Name</label>
-          <input id="a-name" name="name" required placeholder="Weekly Digest Writer"></div>
-        <div class="field"><label for="a-model">Model override</label>
-          <input id="a-model" name="model_override" placeholder="(use the workspace default)">
-          <span class="help">Leave blank unless this agent needs a different one.</span></div>
-      </div>
-      <div class="field"><label for="a-desc">Description</label>
-        <input id="a-desc" name="description" placeholder="What it's for, in one line."></div>
-      <div class="field"><label for="a-prompt">System prompt</label>
-        <textarea id="a-prompt" name="system_prompt" required
-          placeholder="You summarise what an automated run did, for someone who wasn't watching…"></textarea>
-        <span class="help">Tell it what it's for and where its limits are. Anything it may do alone, say so explicitly.</span></div>
-      <div class="field"><label>Tools</label>
-        <span class="help">Only what you tick is reachable. <code class="mono">submit_action</code> stays gated by the human decision gate.</span>
-        <div class="checks">
-          {% for name, purpose in available_tools.items() %}
-          <label><input type="checkbox" name="tools" value="{{ name }}"> <span><code class="mono">{{ name }}</code><br><span class="t">{{ purpose }}</span></span></label>
-          {% endfor %}
-        </div></div>
-      {% if skills %}
-      <div class="field"><label>Skills</label>
-        <span class="help">Folded into the system prompt when the agent runs.</span>
-        <div class="checks">
-          {% for s in skills %}
-          <label><input type="checkbox" name="skills" value="{{ s.skill_id }}"> <span>{{ s.name }}<br><span class="t">{{ s.description[:70] }}</span></span></label>
-          {% endfor %}
-        </div></div>
-      {% endif %}
-      <div><button type="submit">Create agent</button></div>
-    </form>
+<div class="page">
+  {% call ui.title("Agents", "Handoff ships three with opinions baked in. This is for the fourth one you need.") %}
+    <button class="button primary small" data-dialog="#new-agent">{{ ui.icon('i-plus','sm') }} New agent</button>
+  {% endcall %}
+  <div class="page-body">
+    {% if agents %}
+    <div class="grid auto">
+      {% for a in agents %}
+      <a class="card link" href="/agents/{{ a.agent_id }}">
+        <div class="row"><span class="provider-mark">{{ ui.icon('i-chip','sm') }}</span><span class="section-title grow truncate">{{ a.name }}</span>{% if a.builtin %}<span class="pill">built-in</span>{% endif %}{% if not a.enabled %}{{ ui.status('disabled') }}{% endif %}</div>
+        <p class="text-faded text-xs" style="line-height: var(--lh-3)">{{ a.description or 'No description.' }}</p>
+        <div class="row text-faded text-2xs">{{ a.tools|length }} tools{% if a.skills %} · {{ a.skills|length }} skills{% endif %}{% if a.model_override %} · {{ a.model_override }}{% endif %}</div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    {{ ui.empty("No agents yet") }}
+    {% endif %}
   </div>
-</details>
-
-{% if agents %}
-<ul class="rows">
-  {% for a in agents %}
-  <li>
-    <span class="r-name">{{ a.name }}
-      {% if a.builtin %}<span class="pill builtin">built-in</span>{% endif %}
-      {% if not a.enabled %}<span class="pill off">disabled</span>{% endif %}
-    </span>
-    <span class="r-desc">{{ a.description or 'No description.' }}</span>
-    <span class="r-meta">{{ a.tools|length }} tools{% if a.skills %} · {{ a.skills|length }} skills{% endif %}{% if a.model_override %} · {{ a.model_override }}{% endif %}</span>
-    <span class="r-actions">
-      <a class="button" href="/agents/{{ a.agent_id }}">Open</a>
-      {% if not a.builtin %}
-      <button class="danger" hx-post="/agents/{{ a.agent_id }}/delete" hx-target="body" hx-swap="outerHTML"
-              hx-confirm="Delete {{ a.name }}?">Delete</button>
-      {% endif %}
-    </span>
-  </li>
-  {% endfor %}
-</ul>
-{% else %}
-<p class="empty-state">No agents yet.</p>
-{% endif %}
+</div>
+<dialog class="dialog" id="new-agent">
+  <form class="dialog-panel wide" hx-post="/agents/save" hx-target="body" hx-swap="outerHTML">
+    <button type="button" class="icon-button close" data-dialog-close aria-label="Close">{{ ui.icon('i-close','sm') }}</button>
+    <header><h2>New agent</h2><p>Tell it what it's for and where its limits are. Anything it may do alone, say so explicitly.</p></header>
+    <div class="stack" style="gap: var(--size-3)">
+      <div class="field-row">
+        <label class="field"><span>Name</span><input name="name" required placeholder="Weekly Digest Writer"></label>
+        <label class="field"><span>Model override</span><input name="model_override" placeholder="(workspace default)"></label>
+      </div>
+      <label class="field"><span>Description</span><input name="description" placeholder="What it's for, in one line."></label>
+      <label class="field"><span>System prompt</span><textarea name="system_prompt" required placeholder="You summarise what an automated run did, for someone who wasn't watching…"></textarea></label>
+      <div class="field"><span>Tools</span><span class="help">Only what you tick is reachable. <code class="mono">submit_action</code> stays behind the decision gate.</span>
+        <div class="checks">{% for name, purpose in available_tools.items() %}<label><input type="checkbox" name="tools" value="{{ name }}"><span><code class="mono">{{ name }}</code><br><span class="t">{{ purpose }}</span></span></label>{% endfor %}</div></div>
+      {% if skills %}<div class="field"><span>Skills</span><span class="help">Folded into the system prompt when the agent runs.</span>
+        <div class="checks">{% for s in skills %}<label><input type="checkbox" name="skills" value="{{ s.skill_id }}"><span>{{ s.name }}<br><span class="t">{{ s.description[:70] }}</span></span></label>{% endfor %}</div></div>{% endif %}
+    </div>
+    <footer><button type="button" class="button secondary" data-dialog-close>Cancel</button><button type="submit" class="button accent">Create agent</button></footer>
+  </form>
+</dialog>
 {% endblock %}

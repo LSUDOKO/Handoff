@@ -1,7 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Handoff — {{ artifact.name }}{% endblock %}
+{% import "_page.html" as ui %}
+{% block title %}{{ artifact.name }} — Handoff{% endblock %}
 {% block body %}
-{% with title=artifact.name, actions='<a class="button" href="/artifacts">All artifacts</a> <a class="button" href="/artifacts/'+artifact.artifact_id+'/raw">Raw</a>' %}{% include "_page_head.html" %}{% endwith %}
-<p class="page-sub mono">{{ artifact.kind }} · {{ artifact.size }} characters · {{ created }}{% if artifact.run_id %} · <a href="/inspector/{{ artifact.run_id }}">run {{ artifact.run_id }}</a>{% endif %}</p>
-<pre class="mono" style="white-space:pre-wrap;background:var(--paper-raised);border:1px solid var(--rule);border-radius:3px;padding:1.25rem;margin-top:1.25rem;line-height:1.6;font-size:.875rem">{{ artifact.content }}</pre>
+<div class="page">
+  {% call ui.title(artifact.name, artifact.kind ~ " · " ~ artifact.size ~ " chars · " ~ created, [{"label": "Artifacts", "href": "/artifacts"}]) %}
+    <a class="button secondary small" href="/artifacts/{{ artifact.artifact_id }}/raw">Raw</a>
+    {% if artifact.run_id %}<a class="button secondary small" href="/inspector/{{ artifact.run_id }}">Run</a>{% endif %}
+  {% endcall %}
+  <div class="page-body narrow">{{ ui.data('', artifact.content) }}</div>
+</div>
 {% endblock %}

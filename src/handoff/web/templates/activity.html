@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% import "_page.html" as ui %}
+{% block title %}Activity — Handoff{% endblock %}
+{% block body %}
+<div class="page">
+  {{ ui.title("Activity", "What ran while you were away, and the few things it needs you for.") }}
+  <div class="page-body">
+    <div class="stack" style="gap: var(--size-8)">
+
+      <section class="stat-strip">
+        <div class="stat"><span class="v {% if stats.pending %}needs{% endif %}">{{ stats.pending }}</span><span class="k">waiting on you</span></div>
+        <div class="stat"><span class="v done">{{ stats.auto_actions }}</span><span class="k">handled on its own</span></div>
+        <div class="stat"><span class="v">{{ stats.human_decisions }}</span><span class="k">you decided</span></div>
+        <div class="stat"><span class="v">{{ stats.memory_applied }}</span><span class="k">from rules you set</span></div>
+        <div class="stat"><span class="v">{{ stats.runs }}</span><span class="k">runs</span></div>
+      </section>
+
+      <section class="stack" id="live-block" hidden>
+        <div class="section-head"><h2 class="section-title">Right now</h2></div>
+        {% with run_id="*", history=[] %}{% include "_live.html" %}{% endwith %}
+      </section>
+
+      <section class="stack" id="waiting">
+        <div class="section-head">
+          <h2 class="section-title">Waiting on you</h2><span class="section-count">{{ pending_views|length }}</span>
+          {% if pending_views|length > 1 %}<a class="section-action" href="/decide/{{ pending_views[0].payload.interrupt_id }}">Answer one by one →</a>{% endif %}
+        </div>
+        {% if pending_views %}
+        <div class="stack" style="gap: var(--size-3)">
+          {% for d in pending_views %}{% include "_activity_item.html" %}{% endfor %}
+        </div>
+        {% else %}
+        {% call ui.empty("Nothing needs you", "Everything it ran into, it could call on its own. That is the point.") %}{% endcall %}
+        {% endif %}
+      </section>
+
+      <section class="stack">
+        <div class="section-head">
+          <h2 class="section-title">Workflows</h2><span class="section-count">{{ workflows|length }}</span>
+          <a class="section-action" href="/platform">View all</a>
+        </div>
+        {% if workflows %}
+        <ul class="rows">{% for flow in workflows %}{% include "_workflow_row.html" %}{% endfor %}</ul>
+        {% else %}
+        {{ ui.empty("No workflows yet", "Import one from Discover or describe your own in Chat.", "/discover", "Browse templates") }}
+        {% endif %}
+      </section>
+
+      {% if rules %}
+      <section class="stack">
+        <div class="section-head"><h2 class="section-title">What it learned from you</h2><span class="section-count">{{ rules|length }}</span><a class="section-action" href="/memory">All rules</a></div>
+        <ul class="rows rules-list">
+          {% for rule in rules[:6] %}
+          <li class="row-item"><span class="pattern grow">{{ rule.pattern }}</span><span class="act">{{ rule.action|replace('_',' ') }}</span></li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+
+      <section class="stack">
+        <div class="section-head"><h2 class="section-title">Recent activity</h2><span class="section-count">newest first</span></div>
+        {% if audit %}
+        <div class="table-wrap"><table class="table log">
+          <thead><tr><th>Time</th><th>Did</th><th>To</th><th>Decided by</th></tr></thead>
+          <tbody>
+            {% for entry in audit %}
+            <tr><td class="at">{{ entry.at }}</td><td class="what">{{ entry.action }}</td><td class="item">{{ entry.item_id }}</td><td><span class="by {{ entry.decision_by }}">{{ entry.decided_label }}</span></td></tr>
+            {% endfor %}
+          </tbody>
+        </table></div>
+        {% else %}
+        <p class="text-faded">Nothing has run yet. Press <b>Run now</b> on a workflow to watch one go.</p>
+        {% endif %}
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,17 +1,15 @@
-<div class="turn you">
-  <p class="speaker">You</p>
-  <div class="body">{{ user_message }}</div>
-</div>
-<div class="turn">
-  <p class="speaker">Handoff</p>
-  <div class="body">{{ reply }}</div>
+<div class="message user"><div class="bubble">{{ user_message }}</div></div>
+<div class="message assistant">
+  <span class="speaker">Handoff</span>
+  <div class="bubble">{{ reply }}</div>
   {% if config_json %}
-  <pre>{{ config_json }}</pre>
-  <p style="margin-top:1rem">
-    <button hx-post="/chat/save"
-            hx-vals='{"config": {{ config_json_attr }} }'
-            hx-target="#thread"
-            hx-swap="beforeend">Save this workflow</button>
-  </p>
+  <div class="tool-card">
+    <div class="tool-head"><svg class="icon sm"><use href="/static/icons.svg#i-flow"/></svg><span class="name">Workflow config</span><span class="badge success">ready</span></div>
+    <pre>{{ config_json }}</pre>
+    <div class="row">
+      <button class="button accent small" hx-post="/chat/save" hx-vals='{"config": {{ config_json_attr }} }' hx-target="#thread" hx-swap="beforeend">Save and switch on</button>
+      <span class="text-faded text-xs">Saved workflows show up in Workflows and can run on their schedule.</span>
+    </div>
+  </div>
   {% endif %}
 </div>

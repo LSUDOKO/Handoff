@@ -59,6 +59,7 @@ from handoff.tools.voice import (  # noqa: E402
     transcribe,
 )
 from handoff.tools.workflow_store import load_example_workflows  # noqa: E402
+from handoff.web import nav  # noqa: E402
 
 config.configure_observability()
 
@@ -208,13 +209,26 @@ def _audit_view(entry) -> dict[str, Any]:
 def _context(request: Request, page: str, **extra: Any) -> dict[str, Any]:
     """Everything the shell needs, plus whatever the page adds."""
     store = get_store()
-    workspace = _workspace()
+    workspace = extra.pop("workspace", None) or _workspace()
+    workspaces = store.list_workspaces()
+    path = request.url.path
+    # The sidebar unfolds the workspace the URL is about, not the one that
+    # happens to be selected — a page about workspace B should not show
+    # workspace A expanded.
+    active_id = workspace.workspace_id if path.startswith("/platform/") or path.startswith("/memory/") else None
     return {
         "request": request,
         "page": page,
         "settings": config.settings_summary(),
         "workspace": workspace,
-        "workspaces": store.list_workspaces(),
+        "workspaces": workspaces,
+        "nav": nav.build(path, workspaces, active_id),
+        "ws_json": json.dumps(
+            [
+                {"id": w.workspace_id, "name": w.name, "color": getattr(w, "color", "amber")}
+                for w in workspaces
+            ]
+        ),
         "stats": store.stats(),
         "scheduler": daemon.get_scheduler().status(),
         "voice_enabled": stt_available(),
@@ -225,10 +239,20 @@ def _context(request: Request, page: str, **extra: Any) -> dict[str, Any]:
 def _decision_context(request: Request, payload: InterruptPayload) -> dict[str, Any]:
     threshold = config.CONFIDENCE_THRESHOLD
     workflow = get_store().get_workflow(payload.workflow_id)
+    workflow_name = workflow.name if workflow is not None else payload.workflow_id
     if workflow is not None and workflow.confidence_threshold:
         threshold = workflow.confidence_threshold
 
     confidence = payload.agent_analysis.confidence
+    # Why the gate stopped. The threshold is the usual reason, but the agent
+    # can also flag an item outright — irreversible, or outside its brief —
+    # and then a confident number next to "needs 70%" reads as a contradiction.
+    if confidence < threshold:
+        gate_kind = "threshold"
+    elif "rule" in (payload.reason or "").lower():
+        gate_kind = "rule"
+    else:
+        gate_kind = "flagged"
     suggested = payload.agent_analysis.suggested_action
 
     options = []
@@ -270,6 +294,8 @@ def _decision_context(request: Request, payload: InterruptPayload) -> dict[str, 
         request,
         "decision",
         payload=payload,
+        workflow_name=workflow_name,
+        gate_kind=gate_kind,
         options=options,
         confidence_pct=round(confidence * 100),
         threshold_pct=round(threshold * 100),
@@ -302,6 +328,25 @@ def _workspace() -> Workspace:
     return store.default_workspace()
 
 
+def _reconcile_runs() -> None:
+    """A run that says "running" after a restart is not running.
+
+    Threads don't survive the process. Left alone, the row shows a pulsing
+    RUNNING badge forever and the sidebar counts it as busy. Mark it failed
+    with a reason a person can act on, rather than pretending.
+    """
+    from handoff.models import RunStatus
+
+    store = get_store()
+    for run in store.list_runs():
+        if run.status == RunStatus.RUNNING and run.run_id not in _RUNNING.values():
+            run.status = RunStatus.FAILED
+            run.summary = run.summary or "Interrupted: Handoff was restarted while this run was in progress."
+            run.finished_at = datetime.now(UTC)
+            store.save_run(run)
+            events.emit(run.run_id, "failed", "interrupted by restart")
+
+
 @app.on_event("startup")
 def _startup() -> None:
     """Bring the install up, then start the scheduler.
@@ -313,6 +358,7 @@ def _startup() -> None:
     new = {k: v for k, v in report.items() if isinstance(v, list) and v}
     if new:
         print(f"[handoff] first-run setup: { {k: len(v) for k, v in new.items()} }")
+    _reconcile_runs()
     daemon.get_scheduler().start()
     print("[handoff] scheduler running")
 
@@ -322,22 +368,53 @@ def _shutdown() -> None:
     daemon.get_scheduler().stop()
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
+def home():
+    """Land on the workspace, the way you'd open the app in the morning."""
+    return RedirectResponse(f"/platform/{_workspace().workspace_id}", status_code=303)
+
+
+@app.get("/activity", response_class=HTMLResponse)
 def dashboard(request: Request):
-    """The log: what ran, what it did, and what it needs from you."""
+    """What ran, what it did, and the few things it needs from you."""
     store = get_store()
+    pending = store.pending_interrupts()
     return templates.TemplateResponse(
         request=request,
-        name="dashboard.html",
+        name="activity.html",
         context=_context(
             request,
             "activity",
-            pending=store.pending_interrupts(),
+            pending=pending,
+            pending_views=[_decision_context(request, p) for p in pending],
             workflows=[_flow_view(w, store) for w in store.list_workflows()],
             audit=[_audit_view(e) for e in store.list_audit(limit=40)],
             rules=list_preferences(),
         ),
     )
+
+
+@app.post("/activity/{interrupt_id}/decide", response_class=HTMLResponse)
+def activity_decide(
+    request: Request, interrupt_id: str, action: str = Form(...), note: str = Form("")
+):
+    """Answer a decision inline from Activity; the card re-renders as decided."""
+    store = get_store()
+    payload = store.get_interrupt(interrupt_id)
+    if payload is None:
+        raise HTTPException(404, "That decision no longer exists")
+    try:
+        submit_decision(interrupt_id, action, note)
+    except Exception as exc:
+        raise HTTPException(500, f"Could not resume the run: {exc}") from exc
+    refreshed = store.get_interrupt(interrupt_id) or payload
+    response = templates.TemplateResponse(
+        request=request,
+        name="_activity_item.html",
+        context={**_context(request, "activity"), "d": _decision_context(request, refreshed)},
+    )
+    response.headers["X-Toast"] = f"Decided: {action.replace('_', ' ')}"
+    return response
 
 
 @app.post("/workflow/{workflow_id}/run", response_class=HTMLResponse)
@@ -626,6 +703,20 @@ def api_pending():
     )
 
 
+@app.get("/api/status")
+def api_status():
+    """What the sidebar polls: pending decisions, runs in flight, provider."""
+    store = get_store()
+    running = [r for r in store.list_runs() if r.status.value == "running"]
+    return {
+        "pending": len(store.pending_interrupts()),
+        "busy": len(running),
+        "scheduler": daemon.get_scheduler().status().get("running", False),
+        "provider": config.active_provider(),
+        "model": config.active_model_id(),
+    }
+
+
 @app.get("/api/stats")
 def api_stats():
     return JSONResponse(get_store().stats())
@@ -703,15 +794,18 @@ def workspace_create(
     name: str = Form(...),
     description: str = Form(""),
     icon: str = Form("◆"),
+    color: str = Form("amber"),
 ):
     from handoff.platform.bootstrap import seed_memory_stores
 
     store = get_store()
-    workspace = Workspace(name=name.strip(), description=description, icon=icon or "◆")
+    workspace = Workspace(
+        name=name.strip(), description=description, icon=icon or "◆", color=color or "amber"
+    )
     store.workspaces.put(workspace, "workspace_id")
     seed_memory_stores(workspace.workspace_id)
     _ACTIVE_WORKSPACE["id"] = workspace.workspace_id
-    return _settings_page(request, flash=f"Created {workspace.name}.", kind="ok")
+    return RedirectResponse(f"/platform/{workspace.workspace_id}", status_code=303)
 
 
 @app.get("/workspace/export")
@@ -734,11 +828,58 @@ def platform_page(request: Request):
     store = get_store()
     return templates.TemplateResponse(
         request=request,
-        name="platform.html",
+        name="workflows.html",
         context=_context(
             request,
             "platform",
             workflows=[_flow_view(w, store) for w in store.list_workflows()],
+        ),
+    )
+
+
+def _select_workspace(workspace_id: str) -> Workspace:
+    store = get_store()
+    workspace = store.get_workspace(workspace_id)
+    if workspace is None:
+        raise HTTPException(404, f"No workspace '{workspace_id}'")
+    _ACTIVE_WORKSPACE["id"] = workspace_id
+    return workspace
+
+
+def _trigger_views(workflows) -> list[dict[str, Any]]:
+    views = []
+    for w in workflows:
+        kind = w.trigger.type.value
+        views.append(
+            {
+                "type": kind,
+                "readable": _schedule_line(w) if kind == "cron" else kind.replace("_", " "),
+                "workflow": w.name,
+            }
+        )
+    return views
+
+
+@app.get("/platform/{workspace_id}", response_class=HTMLResponse)
+def workspace_overview(request: Request, workspace_id: str):
+    """The workspace at a glance: latest runs, workflows, triggers, agents."""
+    from handoff.platform import credentials as creds
+
+    workspace = _select_workspace(workspace_id)
+    store = get_store()
+    workflows = store.list_workflows()
+    return templates.TemplateResponse(
+        request=request,
+        name="platform.html",
+        context=_context(
+            request,
+            "overview",
+            workspace=workspace,
+            workflows=[_flow_view(w, store) for w in workflows],
+            runs=_run_rows(store, limit=4),
+            triggers=_trigger_views(workflows),
+            agents=store.custom_agents.all(),
+            credentials=[c for c in creds.catalogue() if c.get("connected")][:6],
         ),
     )
 
@@ -1087,11 +1228,9 @@ def agents_delete(request: Request, agent_id: str):
 # --- sessions ---------------------------------------------------------------
 
 
-@app.get("/inspector", response_class=HTMLResponse)
-def inspector_page(request: Request):
-    store = get_store()
+def _run_rows(store, limit: int = 40) -> list[dict[str, Any]]:
     rows = []
-    for run in store.list_runs(limit=40):
+    for run in store.list_runs(limit=limit):
         workflow = store.get_workflow(run.workflow_id)
         session = store.get_session(run.run_id)
         duration = ""
@@ -1101,18 +1240,68 @@ def inspector_page(request: Request):
         rows.append(
             {
                 "run_id": run.run_id,
+                "workflow_id": run.workflow_id,
                 "workflow_name": workflow.name if workflow else run.workflow_id,
                 "status": run.status.value,
                 "summary": run.summary,
                 "started": _ago(run.started_at),
                 "duration": duration,
+                "auto_count": run.auto_count,
+                "interrupt_count": run.interrupt_count,
+                "memory_count": run.memory_count,
                 "model_calls": session.model_calls if session else 0,
                 "tool_calls": session.tool_calls if session else 0,
             }
         )
+    return rows
+
+
+@app.get("/inspector", response_class=HTMLResponse)
+def inspector_page(request: Request):
     return templates.TemplateResponse(
-        request=request, name="inspector.html", context=_context(request, "inspector", sessions=rows)
+        request=request,
+        name="inspector.html",
+        context=_context(request, "inspector", sessions=_run_rows(get_store())),
     )
+
+
+def _blocks(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Group consecutive steps by graph node, the way the run actually moved."""
+    blocks: list[dict[str, Any]] = []
+    for step in steps:
+        node = step.get("node") or "run"
+        if not blocks or blocks[-1]["node"] != node:
+            blocks.append(
+                {"node": node, "steps": [], "duration_ms": 0, "status": "ok", "gated": False}
+            )
+        block = blocks[-1]
+        block["steps"].append(step)
+        block["duration_ms"] += int(step.get("duration_ms") or 0)
+        if step.get("status") == "error":
+            block["status"] = "error"
+        if step.get("gated"):
+            block["gated"] = True
+    return blocks
+
+
+def _waterfall(steps: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Offsets for the timeline. Steps are sequential, so offsets accumulate."""
+    if not steps:
+        return None
+    total = sum(int(s.get("duration_ms") or 0) for s in steps) or 1
+    rows, cursor = [], 0
+    for s in steps:
+        ms = int(s.get("duration_ms") or 0)
+        rows.append(
+            {
+                **s,
+                "left": round(cursor / total * 100, 2),
+                "width": max(round(ms / total * 100, 2), 0.4),
+            }
+        )
+        cursor += ms
+    ticks = [{"pct": pct, "label": f"{int(total * pct / 100)}"} for pct in (0, 25, 50, 75, 100)]
+    return {"rows": rows, "total_ms": total, "ticks": ticks}
 
 
 @app.get("/inspector/{run_id}", response_class=HTMLResponse)
@@ -1126,10 +1315,31 @@ def inspector_detail(request: Request, run_id: str):
     steps = [
         {
             **step.model_dump(mode="json"),
+            "index": index,
             "input_pretty": json.dumps(step.input, indent=2, default=str) if step.input else "",
         }
-        for step in (session.steps if session else [])
+        for index, step in enumerate(session.steps if session else [], start=1)
     ]
+    workflow = store.get_workflow(run.workflow_id)
+    view = _run_view(run)
+    view.update(
+        workflow_id=run.workflow_id,
+        workflow_name=workflow.name if workflow else run.workflow_id,
+        started=_ago(run.started_at),
+        duration=next(
+            (r["duration"] for r in _run_rows(store, limit=60) if r["run_id"] == run_id), ""
+        ),
+    )
+    records = [u for u in store.list_usage() if u.run_id == run_id]
+    usage = None
+    if records:
+        from handoff.platform.usage import estimate_cost
+
+        usage = {
+            "tokens": sum(u.total_tokens for u in records),
+            "cost": sum(estimate_cost(u.model, u.input_tokens, u.output_tokens) for u in records),
+            "model": records[-1].model,
+        }
 
     return templates.TemplateResponse(
         request=request,
@@ -1137,9 +1347,12 @@ def inspector_detail(request: Request, run_id: str):
         context=_context(
             request,
             "inspector",
-            run=_run_view(run),
+            run=view,
             session=session,
             steps=steps,
+            blocks=_blocks(steps),
+            waterfall=_waterfall(steps),
+            usage=usage,
         ),
     )
 
@@ -1316,3 +1529,34 @@ def api_session(run_id: str):
     if session is None:
         raise HTTPException(404, "No trace for that run")
     return JSONResponse(session.model_dump(mode="json"))
+
+
+# --- workspace-scoped routes ----------------------------------------------------------
+# The same pages, entered through a workspace. Selecting the workspace first is
+# what makes the sidebar unfold the right one and the page read from it.
+
+_SECTIONS = {
+    "activity": lambda request: dashboard(request),
+    "chat": lambda request: chat_page(request),
+    "agents": lambda request: agents_page(request),
+    "skills": lambda request: skills_page(request),
+    "workflows": lambda request: platform_page(request),
+    "runs": lambda request: inspector_page(request),
+    "settings": lambda request: settings_page(request),
+    "edit": lambda request: settings_page(request),
+}
+
+
+@app.get("/platform/{workspace_id}/{section}", response_class=HTMLResponse)
+def workspace_section(request: Request, workspace_id: str, section: str):
+    _select_workspace(workspace_id)
+    handler = _SECTIONS.get(section)
+    if handler is None:
+        raise HTTPException(404, f"No section '{section}'")
+    return handler(request)
+
+
+@app.get("/memory/{workspace_id}", response_class=HTMLResponse)
+def workspace_memory(request: Request, workspace_id: str):
+    _select_workspace(workspace_id)
+    return memory_page(request)

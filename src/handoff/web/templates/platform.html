@@ -1,13 +1,85 @@
 {% extends "base.html" %}
-{% block title %}Handoff — Workflows{% endblock %}
+{% import "_page.html" as ui %}
+{% block title %}{{ workspace.name }} — Handoff{% endblock %}
 {% block body %}
-{% with title="Workflows", subtitle="What runs, when it runs, and where the human line sits.", actions='<a class="button" href="/chat">Build a workflow</a> <a class="button" href="/discover">Import a template</a>' %}{% include "_page_head.html" %}{% endwith %}
+<div class="page">
+  {% call ui.title(workspace.name, workspace.description or "Your workflows, agents and triggers — and what they did.") %}
+    <details class="dropdown">
+      <summary class="button secondary small">{{ ui.icon('i-dots','sm') }}</summary>
+      <div class="dropdown-menu">
+        <a href="/platform/{{ workspace.workspace_id }}/edit">{{ ui.icon('i-pencil','sm') }} Edit workspace.yml</a>
+        <a href="/workspace/export">{{ ui.icon('i-download','sm') }} Export</a>
+        <a href="/chat">{{ ui.icon('i-chat','sm') }} Build a workflow</a>
+        <a href="/discover">{{ ui.icon('i-discover','sm') }} Import a template</a>
+      </div>
+    </details>
+  {% endcall %}
+  <div class="page-body">
+    <div class="stack" style="gap: var(--size-6)">
+      <form class="ask" action="/chat" method="get" onsubmit="sessionStorage.setItem('handoff.seed.{{ workspace.workspace_id }}', this.q.value); this.q.value='';">
+        <textarea name="q" rows="1" data-autosize data-submit-on-enter placeholder="Ask this workspace, or describe a chore it should take over…" aria-label="Ask"></textarea>
+        <button class="button accent" type="submit">Ask</button>
+      </form>
 
-{% if workflows %}
-<ul class="flows">
-  {% for flow in workflows %}{% with flow=flow %}{% include "_workflow_row.html" %}{% endwith %}{% endfor %}
-</ul>
-{% else %}
-<p class="empty-state">No workflows in this workspace yet.<br><a href="/discover">Start from a template</a> or <a href="/chat">describe one in chat</a>.</p>
-{% endif %}
+      <div class="overview">
+        <section class="stack">
+          {% if runs %}
+          {% set r = runs[0] %}
+          <a class="card link run-card" href="/inspector/{{ r.run_id }}">
+            <div class="row"><span class="section-title">{{ r.workflow_name }}</span>{{ ui.status(r.status) }}<span class="ml-auto counters">
+              <span class="counter agent"><b>{{ r.auto_count }}</b> alone</span><span class="counter needs"><b>{{ r.interrupt_count }}</b> you</span><span class="counter memory"><b>{{ r.memory_count }}</b> rules</span></span></div>
+            {% if r.summary %}<p class="task">{{ r.summary }}</p>{% endif %}
+            <div class="meta"><span>Started {{ r.started }}</span>{% if r.duration %}<span>·</span><span>Ran {{ r.duration }}</span>{% endif %}<span>·</span><span>{{ r.model_calls }} model calls</span></div>
+          </a>
+          {% for r in runs[1:4] %}
+          <a class="row-item link" href="/inspector/{{ r.run_id }}"><span class="primary">{{ r.workflow_name }}</span>{{ ui.status(r.status) }}<span class="meta ml-auto">{{ r.started }}{% if r.duration %} · {{ r.duration }}{% endif %}</span></a>
+          {% endfor %}
+          {% else %}
+          <div class="card">{{ ui.empty("No runs yet", "Press Run now on a workflow and its first run lands here.") }}</div>
+          {% endif %}
+        </section>
+
+        <section class="card">
+          <header class="section-head"><h2 class="section-title">Workflows</h2><span class="section-count">{{ workflows|length }}</span><a class="section-action" href="/platform/{{ workspace.workspace_id }}/workflows">View all</a></header>
+          <div class="rows">
+            {% for flow in workflows %}
+            <div class="row-item" id="flow-{{ flow.workflow_id }}">
+              <div class="stack grow" style="gap:1px"><span class="primary truncate">{{ flow.name }}</span><span class="meta">{{ flow.schedule_readable }}</span></div>
+              {% if flow.pending_count %}<a class="badge needs" href="/activity#waiting">{{ flow.pending_count }}</a>{% endif %}
+              <button class="button icon-only secondary small" title="Run now" hx-post="/workflow/{{ flow.workflow_id }}/run" hx-target="#flow-{{ flow.workflow_id }}" hx-swap="none" hx-disabled-elt="this" hx-on::after-request="toast('Run started'); setTimeout(()=>location.reload(), 800)">{{ ui.icon('i-play','sm') }}</button>
+            </div>
+            {% else %}
+            <p class="text-faded text-xs">None yet. <a class="text-bright" href="/discover">Import a template</a>.</p>
+            {% endfor %}
+          </div>
+          <div class="divider"></div>
+          <header class="section-head"><h2 class="section-title">Integrations</h2><a class="section-action" href="/credentials">Manage</a></header>
+          <div class="rows">
+            {% for c in credentials %}
+            <div class="row-item"><span class="provider-mark">{{ c.label[:1] }}</span><span class="primary grow">{{ c.label }}</span><span class="status-badge {{ 'ok' if c.status == 'connected' else ('error' if c.status == 'needs_attention' else '') }}">{{ c.status|replace('_',' ') }}</span></div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="card">
+          <header class="section-head"><h2 class="section-title">Triggers</h2><span class="section-count">{{ triggers|length }}</span><a class="section-action" href="/schedules">Schedules</a></header>
+          <div class="rows">
+            {% for t in triggers %}
+            <div class="row-item"><span class="chip {{ t.type }}">{{ t.type }}</span><div class="stack grow" style="gap:1px"><span class="primary truncate">{{ t.readable }}</span><span class="meta">→ {{ t.workflow }}</span></div></div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="card">
+          <header class="section-head"><h2 class="section-title">Agents</h2><span class="section-count">{{ agents|length }}</span><a class="section-action" href="/agents">View all</a></header>
+          <div class="rows">
+            {% for a in agents %}
+            <a class="row-item link" href="/agents/{{ a.agent_id }}"><span class="provider-mark">{{ ui.icon('i-chip','sm') }}</span><div class="stack grow" style="gap:1px"><span class="primary">{{ a.name }}</span><span class="meta truncate">{{ a.description }}</span></div>{% if a.builtin %}<span class="pill">built-in</span>{% endif %}</a>
+            {% endfor %}
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

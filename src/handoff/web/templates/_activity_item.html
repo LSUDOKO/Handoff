@@ -1,0 +1,27 @@
+{% import "_page.html" as ui %}
+<article class="card {% if not d.payload.resolved %}needs{% endif %} waiting-card" id="item-{{ d.payload.interrupt_id }}">
+  <div class="stack" style="gap: var(--size-1)">
+    <div class="row">
+      <span class="badge needs">{{ d.confidence_pct }}% sure</span>
+      <span class="text-faded text-xs">{{ d.workflow_name or d.payload.workflow_id }}</span>
+      {% if d.payload.resolved %}<span class="status-badge completed">decided</span>{% endif %}
+    </div>
+    <a class="subject" href="/decide/{{ d.payload.interrupt_id }}">{{ d.payload.item.subject or d.payload.item.summary }}</a>
+    <span class="who">{{ d.payload.item.sender }}</span>
+    {% if d.payload.item.snippet %}<span class="text-faded text-xs truncate">{{ d.payload.item.snippet }}</span>{% endif %}
+    {% if not d.payload.resolved %}
+    <p class="verdict"><b>{{ d.confidence_pct }}%</b> sure {{ d.payload.agent_analysis.suggested_action|action_phrase }} is right{% if d.gate_kind == 'threshold' %} — needs {{ d.threshold_pct }}% to act alone.{% else %} — flagged for you anyway.{% endif %}</p>
+    <p class="why">{{ d.payload.agent_analysis.reasoning or d.payload.reason }}</p>
+    {% else %}
+    <p class="decided">{{ ui.icon('i-check','sm') }} {{ d.resolved_line }}</p>
+    {% endif %}
+  </div>
+  {% if not d.payload.resolved %}
+  <form class="quick" hx-post="/activity/{{ d.payload.interrupt_id }}/decide" hx-target="#item-{{ d.payload.interrupt_id }}" hx-swap="outerHTML" hx-disabled-elt="find button">
+    {% for option in d.options %}
+    <button class="button primary small {% if option.suggested %}suggested{% endif %}" name="action" value="{{ option.value }}" title="{{ option.hint }}">{{ option.label }}</button>
+    {% endfor %}
+    <input class="input" name="note" placeholder="a note for next time (optional)" style="min-block-size: var(--size-6); inline-size: 100%; font-size: var(--font-size-2)">
+  </form>
+  {% endif %}
+</article>

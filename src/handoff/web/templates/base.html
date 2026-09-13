@@ -4,68 +4,126 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Handoff{% endblock %}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css">
-  <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2" crossorigin="anonymous"></script>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/reset.css">
+  <link rel="stylesheet" href="/static/ui.css">
+  <link rel="stylesheet" href="/static/pages.css">
+  <script>try{var t=localStorage.getItem("handoff.theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/1.9.12/htmx.min.js" crossorigin="anonymous"></script>
+  <script defer src="/static/app.js"></script>
   <script defer src="/static/handoff.js"></script>
+  {% block head %}{% endblock %}
 </head>
-<body data-voice="{{ 'on' if voice_enabled else 'off' }}">
+<body data-voice="{{ 'on' if voice_enabled else 'off' }}" data-workspace="{{ workspace.workspace_id if workspace else '' }}" hx-boost="false">
+<script type="application/json" id="ws-data">{{ ws_json|safe }}</script>
 {% block chrome %}
-<div class="shell">
-  <aside class="sidebar">
-    <a class="brand" href="/">
-      <span class="brand-mark">⌁</span>
-      <span class="brand-name">Handoff<span>.</span></span>
-    </a>
+<div class="app-root">
+  <div class="app-shell">
+    <header class="sidebar">
+      <div class="sidebar-header">
+        <a class="brand" href="/">
+          <svg class="icon" aria-hidden="true"><use href="/static/icons.svg#i-mark"/></svg>
+          <h1>Handoff</h1>
+        </a>
+        <button type="button" class="icon-button theme" data-role="theme" aria-label="Switch theme">
+          <svg class="icon sm" aria-hidden="true"><use href="/static/icons.svg#i-moon"/></svg>
+        </button>
+      </div>
 
-    <form class="ws-switch" hx-post="/workspace/switch" hx-swap="none" hx-on::after-request="location.reload()">
-      <select name="workspace_id" onchange="this.form.requestSubmit()" aria-label="Workspace">
-        {% for w in workspaces %}
-        <option value="{{ w.workspace_id }}" {% if w.workspace_id == workspace.workspace_id %}selected{% endif %}>{{ w.icon }} {{ w.name }}</option>
-        {% endfor %}
-      </select>
-    </form>
+      <nav class="sidebar-nav" aria-label="Primary">
+        <ul class="section-list">
+          {% for entry in nav.tools %}
+          <li>
+            <a href="{{ entry.item.href }}" class="nav-item" {% if entry.active %}aria-current="page"{% endif %}>
+              <svg class="icon" aria-hidden="true"><use href="/static/icons.svg#{{ entry.item.icon }}"/></svg>
+              <span class="nav-label">{{ entry.item.label }}</span>
+              {% if entry.item.badge == 'pending' %}
+              <span class="pending-badge needs" data-role="pending-count" {% if not stats.pending %}hidden{% endif %}>{{ stats.pending or '' }}</span>
+              {% endif %}
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
 
-    <nav>
-      <p class="nav-group">Run</p>
-      <a href="/" {% if page == 'activity' %}aria-current="page"{% endif %}>Activity{% if stats.pending %}<span class="badge needs">{{ stats.pending }}</span>{% endif %}</a>
-      <a href="/platform" {% if page == 'platform' %}aria-current="page"{% endif %}>Workflows<span class="badge">{{ stats.workflows }}</span></a>
-      <a href="/schedules" {% if page == 'schedules' %}aria-current="page"{% endif %}>Schedules<span class="badge">{{ stats.schedules }}</span></a>
+        <ul class="section-list">
+          <li>
+            <a href="{{ nav.discover.item.href }}" class="nav-item" {% if nav.discover.active %}aria-current="page"{% endif %}>
+              <svg class="icon" aria-hidden="true"><use href="/static/icons.svg#{{ nav.discover.item.icon }}"/></svg>
+              <span class="nav-label">{{ nav.discover.item.label }}</span>
+            </a>
+          </li>
+        </ul>
 
-      <p class="nav-group">Build</p>
-      <a href="/chat" {% if page == 'chat' %}aria-current="page"{% endif %}>Build a workflow</a>
-      <a href="/agents" {% if page == 'agents' %}aria-current="page"{% endif %}>Agents<span class="badge">{{ stats.custom_agents }}</span></a>
-      <a href="/skills" {% if page == 'skills' %}aria-current="page"{% endif %}>Skills<span class="badge">{{ stats.skills }}</span></a>
-      <a href="/discover" {% if page == 'discover' %}aria-current="page"{% endif %}>Discover</a>
+        <details open>
+          <summary>
+            <div class="section-header">
+              <span class="section-trigger">Workspaces <svg class="icon xs" aria-hidden="true"><use href="/static/icons.svg#i-caret-down"/></svg></span>
+              <button type="button" class="icon-button" data-dialog="#add-workspace" aria-label="Add workspace" onclick="event.preventDefault()">
+                <svg class="icon sm" aria-hidden="true"><use href="/static/icons.svg#i-plus"/></svg>
+              </button>
+            </div>
+          </summary>
+          <ul class="section-list">
+            {% for ws in nav.workspaces %}
+            <li>
+              <a href="/platform/{{ ws.id }}" class="nav-item{% if ws.active %} active{% endif %}" {% if ws.active and nav.path == '/platform/' ~ ws.id %}aria-current="page"{% endif %}>
+                <span class="ws-dot" data-color="{{ ws.color }}"></span>
+                <span class="nav-label">{{ ws.name }}</span>
+                {% if ws.requires_setup %}<span class="setup-badge">Setup</span>{% endif %}
+              </a>
+              {% if ws.active %}
+              <ul class="sub-nav">
+                {% for sub in ws.sub %}
+                <li><a href="{{ sub.href }}" class="nav-item" {% if sub.is_active(nav.path) %}aria-current="page"{% endif %}><span class="nav-label">{{ sub.label }}</span></a></li>
+                {% endfor %}
+              </ul>
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+        </details>
+      </nav>
 
-      <p class="nav-group">Connect</p>
-      <a href="/credentials" {% if page == 'credentials' %}aria-current="page"{% endif %}>Credentials<span class="badge">{{ stats.credentials }}</span></a>
-      <a href="/mcp" {% if page == 'mcp' %}aria-current="page"{% endif %}>Tool servers</a>
+      <div class="sidebar-footer">
+        <a class="docs" href="https://github.com/LSUDOKO/Handoff#readme" target="_blank" rel="noopener">Docs</a>
+        <button type="button" class="status online" data-role="online" title="{{ settings.provider }} · {{ settings.model_id }}"><i></i><span>Online</span></button>
+      </div>
+    </header>
 
-      <p class="nav-group">Inspect</p>
-      <a href="/inspector" {% if page == 'inspector' %}aria-current="page"{% endif %}>Sessions</a>
-      <a href="/artifacts" {% if page == 'artifacts' %}aria-current="page"{% endif %}>Artifacts<span class="badge">{{ stats.artifacts }}</span></a>
-      <a href="/memory" {% if page == 'memory' %}aria-current="page"{% endif %}>Memory<span class="badge">{{ stats.learned_rules }}</span></a>
-      <a href="/usage" {% if page == 'usage' %}aria-current="page"{% endif %}>Usage</a>
-    </nav>
-
-    <div class="sidebar-foot">
-      <a href="/settings" class="settings-link {% if page == 'settings' %}on{% endif %}">Settings</a>
-      <button type="button" class="voice-toggle" data-role="voice-toggle" title="Read decisions and replies aloud">Voice off</button>
-      <p class="runtime">
-        <span class="dot {{ 'live' if scheduler.running else '' }}"></span>
-        {{ 'scheduler running' if scheduler.running else 'scheduler idle' }}
-      </p>
-      <p class="runtime">{{ settings.provider }} · {{ settings.model_id }}</p>
-    </div>
-  </aside>
-
-  <div class="content">
-    {% block body %}{% endblock %}
+    <main class="app-main">
+      <div class="app-content">
+        {% block body %}{% endblock %}
+      </div>
+    </main>
   </div>
 </div>
+
+<dialog class="dialog" id="add-workspace">
+  <form class="dialog-panel" method="post" action="/workspace/create">
+    <button type="button" class="icon-button close" data-dialog-close aria-label="Close"><svg class="icon sm"><use href="/static/icons.svg#i-close"/></svg></button>
+    <header>
+      <h2>Add a workspace</h2>
+      <p>Your workflows, agents, and triggers. Ready to run.</p>
+    </header>
+    <div class="stack">
+      <label class="field"><span>Name</span><input name="name" required placeholder="Sales ops" autocomplete="off"></label>
+      <label class="field"><span>What is it for? <em>(optional)</em></span><input name="description" placeholder="Inbox, tickets, and the Monday report"></label>
+      <div class="field"><span>Colour</span>
+        <div class="row">
+          {% for c in ['amber','blue','green','red','purple','grey'] %}
+          <label class="check"><input type="radio" name="color" value="{{ c }}" {% if loop.first %}checked{% endif %}> <span class="ws-dot" data-color="{{ c }}"></span></label>
+          {% endfor %}
+        </div>
+      </div>
+      <p class="text-faded text-xs">Or <a href="/discover" class="text-bright">start from a template</a> · <a href="/settings#import" class="text-bright">import a workspace.yml</a></p>
+    </div>
+    <footer>
+      <button type="button" class="button secondary" data-dialog-close>Cancel</button>
+      <button type="submit" class="button accent">Create</button>
+    </footer>
+  </form>
+</dialog>
 {% endblock %}
 {% block bare %}{% endblock %}
 </body>
