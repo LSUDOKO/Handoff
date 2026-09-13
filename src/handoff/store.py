@@ -35,6 +35,7 @@ from handoff.models import (
     WorkflowRun,
 )
 from handoff.platform.models import (
+    AgentRun,
     Artifact,
     Chat,
     ChatAgentState,
@@ -251,6 +252,7 @@ class Store:
         self.sessions = _collection("sessions", Session, "session_id")
         self.usage = _collection("usage", UsageRecord, "usage_id")
         self.chats = _collection("chats", Chat, "chat_id")
+        self.agent_runs = _collection("agent_runs", AgentRun, "run_id")
         self.chat_messages = _collection("chat_messages", ChatMessage, "row_id")
         self.chat_agents = _collection("chat_agents", ChatAgentState, "row_id")
 
@@ -414,6 +416,13 @@ class Store:
         items = self._scoped(self.sessions.all(), workspace_id)
         items.sort(key=lambda s: s.started_at, reverse=True)
         return items[:limit]
+
+    # -- agent workbench ---------------------------------------------------------
+
+    def list_agent_runs(self, agent_id: str, limit: int = 20) -> list[AgentRun]:
+        rows = [r for r in self.agent_runs.all() if r.agent_id == agent_id]
+        rows.sort(key=lambda r: r.started_at, reverse=True)
+        return rows[:limit]
 
     # -- chats ---------------------------------------------------------------
 

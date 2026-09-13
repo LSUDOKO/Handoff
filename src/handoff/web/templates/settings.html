@@ -49,7 +49,11 @@
           <div class="row-item"><span class="ws-dot" data-color="{{ w.color }}"></span><a class="primary grow" href="/platform/{{ w.workspace_id }}">{{ w.name }}</a>{% if w.is_default %}<span class="pill">default</span>{% endif %}<span class="meta">{{ w.description }}</span></div>
           {% endfor %}
         </div>
-        <div class="row"><button class="button primary small" data-dialog="#add-workspace">{{ ui.icon('i-plus','sm') }} New workspace</button><a class="button secondary small" href="/workspace/export">{{ ui.icon('i-download','sm') }} Export current</a></div>
+        <div class="row"><button class="button primary small" data-dialog="#add-workspace">{{ ui.icon('i-plus','sm') }} New workspace</button><a class="button secondary small" href="/workspace/{{ workspace.workspace_id }}/export.yml">{{ ui.icon('i-download','sm') }} Download workspace.yml</a></div>
+        <form class="row" method="post" action="/workspace/import" enctype="multipart/form-data" style="flex-wrap: wrap">
+          <input class="input" type="file" name="file" accept=".yml,.yaml,.json,.zip" required style="inline-size: auto">
+          <button class="button secondary small" type="submit">{{ ui.icon('i-upload','sm') }} Import workspace.yml or bundle</button>
+        </form>
         <p class="text-faded text-xs">Separate workspaces keep learned rules and credentials apart — a rule you set for your own mail should not start acting on a shared account.</p>
       </section>
     </div>

@@ -880,6 +880,109 @@ def workspace_export():
     )
 
 
+@app.get("/workspace/{workspace_id}/export.yml")
+def workspace_export_yaml(workspace_id: str):
+    from handoff.platform import workspace_yaml
+
+    workspace = get_store().get_workspace(workspace_id)
+    if workspace is None:
+        raise HTTPException(404, "No such workspace")
+    return Response(
+        content=workspace_yaml.to_yaml(workspace_id),
+        media_type="application/x-yaml",
+        headers={"Content-Disposition": f'attachment; filename="{slug(workspace.name)}-workspace.yml"'},
+    )
+
+
+@app.get("/workspace/{workspace_id}/bundle.zip")
+def workspace_bundle(workspace_id: str):
+    from handoff.platform import workspace_yaml
+
+    workspace = get_store().get_workspace(workspace_id)
+    if workspace is None:
+        raise HTTPException(404, "No such workspace")
+    return Response(
+        content=workspace_yaml.bundle(workspace_id),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{slug(workspace.name)}.zip"'},
+    )
+
+
+@app.post("/workspace/import")
+async def workspace_import(request: Request, file: Annotated[UploadFile, File()]):
+    from handoff.platform import workspace_yaml
+
+    data = await file.read()
+    try:
+        result = workspace_yaml.import_document(data, file.filename or "")
+    except Exception as exc:
+        return _settings_page(request, flash=f"Couldn't import: {exc}", kind="error")
+    _ACTIVE_WORKSPACE["id"] = result["workspace_id"]
+    return RedirectResponse(f"/platform/{result['workspace_id']}", status_code=303)
+
+
+@app.post("/workspace/{workspace_id}/remove")
+def workspace_remove(workspace_id: str):
+    from handoff.platform import workspace_yaml
+
+    try:
+        workspace_yaml.remove(workspace_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except KeyError as exc:
+        raise HTTPException(404, "No such workspace") from exc
+    _ACTIVE_WORKSPACE.pop("id", None)
+    response = Response(status_code=204)
+    response.headers["X-Toast"] = "Workspace removed"
+    return response
+
+
+def _edit_page(request: Request, workspace_id: str, text: str = "", errors=None, saved: str = ""):
+    from handoff.platform import workspace_yaml
+
+    workspace = _select_workspace(workspace_id)
+    return templates.TemplateResponse(
+        request=request,
+        name="workspace_edit.html",
+        context=_context(
+            request,
+            "edit",
+            workspace=workspace,
+            text=text or workspace_yaml.to_yaml(workspace_id),
+            doc=workspace_yaml.document(workspace_id),
+            errors=errors or [],
+            saved=saved,
+        ),
+    )
+
+
+@app.get("/platform/{workspace_id}/edit", response_class=HTMLResponse)
+def workspace_edit(request: Request, workspace_id: str):
+    return _edit_page(request, workspace_id)
+
+
+@app.post("/platform/{workspace_id}/edit", response_class=HTMLResponse)
+def workspace_edit_save(request: Request, workspace_id: str, text: str = Form(...)):
+    from handoff.platform import workspace_yaml
+
+    _select_workspace(workspace_id)
+    parsed = workspace_yaml.parse(text)
+    if not parsed["valid"]:
+        items = "".join(f"<li>{e}</li>" for e in parsed["errors"])
+        return HTMLResponse(
+            f'<div class="callout error"><b>Not saved.</b><ul style="list-style: disc; padding-inline-start: var(--size-5)">{items}</ul></div>'
+        )
+    counts = workspace_yaml.apply(workspace_id, parsed["payload"])
+    response = HTMLResponse(
+        f'<div class="callout">Saved — {counts["workflows"]} workflows, {counts["skills"]} skills, '
+        f'{counts["agents"]} agents, {counts["tool_servers"]} tool servers'
+        + (f', {counts["removed"]} removed' if counts["removed"] else "")
+        + ".</div>"
+    )
+    response.headers["X-Toast"] = "workspace.yml saved"
+    return response
+
+
 # --- workflows --------------------------------------------------------------
 
 
@@ -1245,6 +1348,8 @@ def agent_detail(request: Request, agent_id: str):
     if block:
         resolved = f"{resolved}\n\n{block}".strip()
 
+    from handoff.platform import workbench
+
     return templates.TemplateResponse(
         request=request,
         name="agent_detail.html",
@@ -1255,7 +1360,55 @@ def agent_detail(request: Request, agent_id: str):
             skills=[s for s in store.list_skills(None) if s.enabled],
             available_tools=agents_registry.AVAILABLE_TOOLS,
             resolved_prompt=resolved or "(empty)",
+            runs=store.list_agent_runs(agent_id),
+            preflight=workbench.preflight(agent),
         ),
+    )
+
+
+@app.post("/agents/{agent_id}/run", response_class=HTMLResponse)
+def agent_run(request: Request, agent_id: str, prompt: str = Form(...)):
+    """Run the agent on a prompt from the workbench; returns a live card."""
+    from handoff.platform import workbench
+
+    agent = get_store().custom_agents.get("agent_id", agent_id)
+    if agent is None:
+        raise HTTPException(404, "No such agent")
+    record = workbench.run(agent, prompt)
+    return templates.TemplateResponse(
+        request=request, name="agent_workbench_partial.html", context={"r": record, "request": request}
+    )
+
+
+@app.get("/agents/{agent_id}/runs/{run_id}", response_class=HTMLResponse)
+def agent_run_card(request: Request, agent_id: str, run_id: str):
+    record = get_store().agent_runs.get("run_id", run_id)
+    if record is None:
+        raise HTTPException(404, "No such run")
+    return templates.TemplateResponse(
+        request=request, name="agent_workbench_partial.html", context={"r": record, "request": request}
+    )
+
+
+@app.get("/agents/{agent_id}/runs/{run_id}/events")
+def agent_run_events(agent_id: str, run_id: str):
+    from handoff.platform import workbench
+
+    def stream():
+        for event in events.subscribe(workbench.channel(run_id), replay=True):
+            kind = event.get("kind", "note")
+            if kind == "keepalive":
+                yield ": keepalive\n\n"
+                continue
+            yield f"event: {kind}\ndata: {json.dumps(event, default=str)}\n\n"
+            if kind in ("done", "error"):
+                yield "event: end\ndata: {}\n\n"
+                return
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 
@@ -1603,7 +1756,6 @@ _SECTIONS = {
     "workflows": lambda request: platform_page(request),
     "runs": lambda request: inspector_page(request),
     "settings": lambda request: settings_page(request),
-    "edit": lambda request: settings_page(request),
 }
 
 

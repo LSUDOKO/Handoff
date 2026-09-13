@@ -31,10 +31,11 @@
 
   function bind(el) {
     if (el.dataset.bound) return; el.dataset.bound = "1";
-    const chat = root()?.dataset.chat; const turn = el.dataset.liveTurn; if (!chat || !turn) return;
+    const chat = root()?.dataset.chat; const turn = el.dataset.liveTurn; if (!turn) return;
+    const url = el.dataset.eventsUrl || (chat ? `/chat/${encodeURIComponent(chat)}/events?turn=${encodeURIComponent(turn)}` : null); if (!url) return;
     const body = el.querySelector(".turn-body"); const thinking = el.querySelector(".bubble.thinking");
     let bubble = null, text = "";
-    const es = new EventSource(`/chat/${encodeURIComponent(chat)}/events?turn=${encodeURIComponent(turn)}`);
+    const es = new EventSource(url);
     const ensureBubble = () => { if (!bubble) { bubble = document.createElement("div"); bubble.className = "bubble"; body.append(bubble); thinking?.remove(); } return bubble; };
     const visible = (s) => s.replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, "").replace(/<thinking>[\s\S]*$/i, "");
     es.addEventListener("delta", (e) => { const ev = JSON.parse(e.data); text += ev.text || ""; const v = visible(text); if (v) ensureBubble().textContent = v; scroll(); });
@@ -56,6 +57,7 @@
       el.append(meta);
       if (window.handoffVoice?.enabled && ev.text) window.handoffVoice.say(ev.text.slice(0, 600));
       el.removeAttribute("data-live-turn"); es.close(); scroll();
+      if (el.dataset.reloadUrl) fetch(el.dataset.reloadUrl).then((r) => r.text()).then((html) => { const card = el.closest(".run-card"); if (!card) return; const wrap = document.createElement("div"); wrap.innerHTML = html; card.replaceWith(wrap.firstElementChild); if (window.htmx) htmx.process(wrap.firstElementChild); });
       document.querySelector("[data-role=pending-count]") && fetch("/api/status").catch(() => {});
     });
     es.addEventListener("error", (e) => { try { const ev = JSON.parse(e.data); const c = document.createElement("div"); c.className = "callout error"; c.textContent = ev.text || "Something went wrong."; body.append(c); } catch {} thinking?.remove(); es.close(); });
@@ -67,3 +69,11 @@
   document.addEventListener("DOMContentLoaded", () => { scan(); scroll(); });
   document.body.addEventListener("htmx:afterSwap", (e) => { scan(e.target); scroll(); });
 })();
+
+// Generic tabs: [data-tab] buttons switch sibling [data-panel] sections.
+document.addEventListener("click", (e) => {
+  const tab = e.target.closest(".tab[data-tab]"); if (!tab) return;
+  const scope = tab.closest(".card, .page-body") || document;
+  scope.querySelectorAll(".tab[data-tab]").forEach((t) => t.setAttribute("aria-selected", t === tab));
+  scope.querySelectorAll("[data-panel]").forEach((p) => { p.hidden = p.dataset.panel !== tab.dataset.tab; });
+});

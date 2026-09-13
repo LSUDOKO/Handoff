@@ -369,3 +369,25 @@ class ChatAgentState(BaseModel):
     conversation_manager_state: dict[str, Any] = Field(default_factory=dict)
     created_at: str = ""
     updated_at: str = ""
+
+
+# --- Agent workbench -----------------------------------------------------------
+
+
+class AgentRun(BaseModel):
+    """One run of an agent from the workbench: prompt in, result and trace out."""
+
+    run_id: str = Field(default_factory=lambda: new_id("arun"))
+    agent_id: str = ""
+    workspace_id: str = ""
+    prompt: str = ""
+    status: str = "running"  # running | completed | failed
+    result: str = ""
+    error: str = ""
+    steps: list[dict[str, Any]] = Field(default_factory=list)
+    model: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    duration_ms: int = 0
+    started_at: datetime = Field(default_factory=_now)
+    finished_at: datetime | None = None

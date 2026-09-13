@@ -71,12 +71,13 @@ def _channel(chat_id: str) -> str:
     return f"chat:{chat_id}"
 
 
-class _Narrator(HookProvider):
+class Narrator(HookProvider):
     """Emits a tool_start / tool_end pair for every tool call in a turn."""
 
-    def __init__(self, chat_id: str, turn: int) -> None:
-        self.chat_id = chat_id
+    def __init__(self, channel: str, turn: int) -> None:
+        self.channel = channel
         self.turn = turn
+        self.steps: list[dict[str, Any]] = []
         self._started: dict[str, float] = {}
 
     def register_hooks(self, registry: HookRegistry, **kwargs: Any) -> None:
@@ -88,7 +89,7 @@ class _Narrator(HookProvider):
         tool_id = str(use.get("toolUseId", ""))
         self._started[tool_id] = time.monotonic()
         events.emit(
-            _channel(self.chat_id),
+            self.channel,
             "tool_start",
             f"calling {use.get('name')}",
             turn=self.turn,
@@ -112,14 +113,23 @@ class _Narrator(HookProvider):
                     text += block["text"]
                 elif "json" in block:
                     text += json.dumps(block["json"], indent=2, default=str)
+        step = {
+            "tool_id": tool_id,
+            "name": use.get("name", "tool"),
+            "input": use.get("input", {}),
+            "output": text[:4000],
+            "status": status,
+            "ms": ms,
+        }
+        self.steps.append(step)
         events.emit(
-            _channel(self.chat_id),
+            self.channel,
             "tool_end",
             f"{use.get('name')} {status}",
             turn=self.turn,
             tool_id=tool_id,
-            name=use.get("name", "tool"),
-            output=text[:4000],
+            name=step["name"],
+            output=step["output"],
             status=status,
             ms=ms,
         )
@@ -270,7 +280,7 @@ class ChatService:
             description="The workspace assistant",
             callback_handler=callback,
             session_manager=RepositorySessionManager(session_id=chat_id, session_repository=self._repo),
-            hooks=[_Narrator(chat_id, turn)],
+            hooks=[Narrator(_channel(chat_id), turn)],
         )
 
     # -- turns -------------------------------------------------------------------------

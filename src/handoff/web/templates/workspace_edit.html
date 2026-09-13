@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% import "_page.html" as ui %}
+{% block title %}workspace.yml — {{ workspace.name }} — Handoff{% endblock %}
+{% block body %}
+<div class="page with-aside">
+  <div>
+    {% call ui.title("workspace.yml", "The file is the configuration. Edit it, save it, hand it to a teammate.", [{"label": workspace.name, "href": "/platform/" ~ workspace.workspace_id}]) %}
+      <a class="button secondary small" href="/workspace/{{ workspace.workspace_id }}/export.yml">{{ ui.icon('i-download','sm') }} Download</a>
+      <a class="button secondary small" href="/workspace/{{ workspace.workspace_id }}/bundle.zip">{{ ui.icon('i-folder','sm') }} Bundle</a>
+    {% endcall %}
+    <div class="page-body">
+      <form class="stack" hx-post="/platform/{{ workspace.workspace_id }}/edit" hx-target="#edit-result" hx-swap="innerHTML">
+        <div id="edit-result">{% if errors %}<div class="callout error"><b>Not saved.</b><ul style="list-style: disc; padding-inline-start: var(--size-5)">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% elif saved %}<div class="callout">{{ saved }}</div>{% endif %}</div>
+        <label class="field"><span>Configuration</span><textarea class="code" name="text" spellcheck="false" style="min-block-size: 70vh">{{ text }}</textarea></label>
+        <div class="form-actions"><button class="button accent" type="submit">Save</button><button class="button secondary" type="button" onclick="location.reload()">Revert</button><span class="text-faded text-xs">Saving replaces the workspace's workflows, skills, agents and tool servers with what the file says.</span></div>
+      </form>
+    </div>
+  </div>
+  <aside class="page-aside">
+    <div class="aside-section"><h3>What's in the file</h3><dl class="kv"><dt>Workflows</dt><dd>{{ doc.workflows|length }}</dd><dt>Skills</dt><dd>{{ doc.skills|length }}</dd><dt>Agents</dt><dd>{{ doc.agents|length }}</dd><dt>Tool servers</dt><dd>{{ doc.tool_servers|length }}</dd></dl></div>
+    <div class="aside-section"><h3>Not in the file</h3><p class="text-faded text-xs">Credentials, runs, learned rules and chats. A workspace is shareable; what it runs with, and what it has done, are not.</p></div>
+    <div class="aside-section"><h3>Workflow shape</h3><pre class="text-2xs mono text-faded" style="white-space: pre-wrap">workflow_id: kebab-id
+name: Human name
+trigger: {type: cron, schedule: "0 8 * * 1-5", timezone: America/New_York}
+mcp_tools: [gmail, linear]
+steps: [...]
+memory: {learn_from_decisions: true, preference_key: inbox_rules}
+confidence_threshold: 0.7</pre></div>
+  </aside>
+</div>
+{% endblock %}

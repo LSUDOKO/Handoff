@@ -1,0 +1,28 @@
+{% import "_page.html" as ui %}
+<div class="card run-card" id="arun-{{ r.run_id }}">
+  <div class="row">
+    <span class="status-badge {{ r.status }}">{{ r.status }}</span>
+    <span class="text-bright truncate grow" title="{{ r.prompt }}">{{ r.prompt }}</span>
+    <span class="row text-faded text-2xs">{% if r.duration_ms %}<span class="pill">{{ (r.duration_ms/1000)|round(1) }}s</span>{% endif %}{% if r.input_tokens or r.output_tokens %}<span class="pill">{{ r.input_tokens + r.output_tokens }} tok</span>{% endif %}{% if r.steps %}<span class="pill">{{ r.steps|length }} tool{{ '' if r.steps|length == 1 else 's' }}</span>{% endif %}</span>
+    <button class="button ghost small" type="button" onclick="document.querySelector('[data-role=wb-prompt]').value={{ r.prompt|tojson }}; document.querySelector('[data-role=wb-prompt]').focus()">Re-run</button>
+  </div>
+  {% if r.status == 'running' %}
+  <div class="message assistant" data-live-turn="1" data-events-url="/agents/{{ r.agent_id }}/runs/{{ r.run_id }}/events" data-reload-url="/agents/{{ r.agent_id }}/runs/{{ r.run_id }}">
+    <div class="turn-body"></div>
+    <div class="bubble thinking"><span class="spinner"></span> running…</div>
+  </div>
+  {% else %}
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-tab="result">Result</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="stream">Tool calls <span class="count">{{ r.steps|length }}</span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="trace">Trace</button>
+  </div>
+  <div class="tab-panel" data-panel="result">{% if r.error %}<div class="callout error">{{ r.error }}</div>{% else %}<div class="bubble" style="background: var(--surface-2)">{{ r.result or '(no text)' }}</div>{% endif %}</div>
+  <div class="tab-panel" data-panel="stream" hidden>
+    {% for s in r.steps %}
+    <details class="tool-card {{ 'error' if s.status == 'error' else '' }}"><summary class="tool-head">{{ ui.icon('i-bolt','sm') }}<span class="name">{{ s.name }}</span><span class="badge {{ 'error' if s.status == 'error' else 'success' }}">{{ s.status }} · {{ s.ms }} ms</span></summary>{% if s.input %}<pre>{{ s.input|tojson(indent=2) }}</pre>{% endif %}{% if s.output %}<pre>{{ s.output }}</pre>{% endif %}</details>
+    {% else %}<p class="text-faded text-xs">No tool calls.</p>{% endfor %}
+  </div>
+  <div class="tab-panel" data-panel="trace" hidden>{{ ui.data('', r.model_dump_json(indent=2) if r.model_dump_json is defined else r) }}</div>
+  {% endif %}
+</div>

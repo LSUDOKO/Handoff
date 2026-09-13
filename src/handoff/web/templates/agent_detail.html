@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "_page.html" as ui %}
 {% block title %}{{ agent.name }} — Handoff{% endblock %}
+{% block head %}<script defer src="/static/chat.js"></script>{% endblock %}
 {% block body %}
 <div class="page with-aside">
   <div>
@@ -8,6 +9,17 @@
       {% if not agent.builtin %}<button class="button destructive small" hx-post="/agents/{{ agent.agent_id }}/delete" hx-target="body" hx-swap="outerHTML" hx-confirm="Delete {{ agent.name }}?">Delete</button>{% endif %}
     {% endcall %}
     <div class="page-body">
+      <section class="stack" style="gap: var(--size-3); margin-block-end: var(--size-8)">
+        <div class="section-head"><h2 class="section-title">Workbench</h2><span class="section-count">run this agent on a prompt and watch it work</span></div>
+        <form class="ask" hx-post="/agents/{{ agent.agent_id }}/run" hx-target="#wb-runs" hx-swap="afterbegin" hx-disabled-elt="find button" hx-on::after-request="this.reset()">
+          <textarea name="prompt" rows="1" required data-autosize data-submit-on-enter data-role="wb-prompt" placeholder="{{ 'Triage the inbox and tell me what you set aside.' if 'fetch_unread_emails' in agent.tools else 'Give it a task…' }}" aria-label="Prompt"></textarea>
+          <button class="button accent" type="submit">{{ ui.icon('i-play','sm') }} Run</button>
+        </form>
+        <div class="stack" id="wb-runs" style="gap: var(--size-3)">
+          {% for r in runs %}{% include "agent_workbench_partial.html" %}{% endfor %}
+        </div>
+      </section>
+      <div class="section-head" style="margin-block-end: var(--size-3)"><h2 class="section-title">Definition</h2></div>
       <form class="stack" style="gap: var(--size-4)" hx-post="/agents/save" hx-target="body" hx-swap="outerHTML">
         <input type="hidden" name="agent_id" value="{{ agent.agent_id }}">
         <div class="field-row">
@@ -29,6 +41,11 @@
   </div>
   <aside class="page-aside">
     <div class="aside-section"><h3>Agent</h3><dl class="kv"><dt>Id</dt><dd class="mono">{{ agent.agent_id }}</dd><dt>Kind</dt><dd>{{ 'built-in' if agent.builtin else 'custom' }}</dd><dt>Tools</dt><dd>{{ agent.tools|length }}</dd><dt>Skills</dt><dd>{{ agent.skills|length }}</dd></dl></div>
+    <div class="aside-section"><h3>Credentials it needs</h3>
+      {% if preflight %}<div class="rows">{% for c in preflight %}<div class="row-item" style="min-block-size: var(--size-8)"><span class="provider-mark">{{ c.label[:1] }}</span><span class="primary grow">{{ c.label }}</span>{{ ui.status('ok' if c.connected else 'error', 'connected' if c.connected else 'missing') }}</div>{% endfor %}</div>
+      {% if preflight|rejectattr('connected')|list %}<p class="text-faded text-xs">Missing ones fall back to the synthetic inbox while <code class="mono">USE_MOCK_TOOLS</code> is on. <a class="text-bright" href="/credentials">Connect them</a>.</p>{% endif %}
+      {% else %}<p class="text-faded text-xs">None — every tool this agent has works without a key.</p>{% endif %}
+    </div>
     <div class="aside-section"><h3>Runtime</h3><dl class="kv"><dt>Provider</dt><dd>{{ settings.provider }}</dd><dt>Model</dt><dd class="mono">{{ agent.model_override or settings.model_id }}</dd></dl></div>
   </aside>
 </div>

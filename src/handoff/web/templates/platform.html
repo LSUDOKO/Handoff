@@ -8,9 +8,12 @@
       <summary class="button secondary small">{{ ui.icon('i-dots','sm') }}</summary>
       <div class="dropdown-menu">
         <a href="/platform/{{ workspace.workspace_id }}/edit">{{ ui.icon('i-pencil','sm') }} Edit workspace.yml</a>
-        <a href="/workspace/export">{{ ui.icon('i-download','sm') }} Export</a>
+        <a href="/workspace/{{ workspace.workspace_id }}/export.yml">{{ ui.icon('i-download','sm') }} Download workspace.yml</a>
+        <a href="/workspace/{{ workspace.workspace_id }}/bundle.zip">{{ ui.icon('i-folder','sm') }} Download bundle (.zip)</a>
+        <hr>
         <a href="/chat">{{ ui.icon('i-chat','sm') }} Build a workflow</a>
         <a href="/discover">{{ ui.icon('i-discover','sm') }} Import a template</a>
+        {% if not workspace.is_default %}<hr><button type="button" class="danger" hx-post="/workspace/{{ workspace.workspace_id }}/remove" hx-confirm="Remove {{ workspace.name }}? Its skills, agents, chats and credentials go with it." hx-target="body" hx-swap="none" hx-on::after-request="location.href='/'">{{ ui.icon('i-trash','sm') }} Remove workspace</button>{% endif %}
       </div>
     </details>
   {% endcall %}
