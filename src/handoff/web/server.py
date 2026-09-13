@@ -795,6 +795,117 @@ def live_panel(request: Request, run_id: str):
     )
 
 
+# --- the orb ---------------------------------------------------------------------
+
+
+def _signal_name(workflow) -> str:
+    """A short name for the trigger, the way a person would refer to it."""
+    trig = workflow.trigger
+    if trig.type.value == "webhook":
+        return "webhook"
+    if trig.type.value != "cron" or not trig.schedule:
+        return "manual"
+    parts = trig.schedule.split()
+    hour = parts[1] if len(parts) > 1 else "*"
+    dow = parts[4] if len(parts) > 4 else "*"
+    if dow not in ("*", "1-5", "?"):
+        return "weekly"
+    try:
+        h = int(hour)
+    except ValueError:
+        return "hourly" if hour.startswith("*/") else "schedule"
+    return "morning" if h < 12 else ("afternoon" if h < 17 else "evening")
+
+
+def _work_card_context(workflow) -> dict[str, Any]:
+    described = describe_schedule(workflow.trigger.schedule, workflow.trigger.timezone) if workflow.trigger.schedule else {}
+    threshold = workflow.confidence_threshold or config.CONFIDENCE_THRESHOLD
+    step_by_tool: dict[str, str] = {}
+    for step in workflow.steps:
+        action = str(step.get("action", ""))
+        if "." in action:
+            tool, _, op = action.partition(".")
+            step_by_tool.setdefault(tool, op.replace("_", " "))
+    agents = [
+        {"name": t, "kind": "MCP", "role": step_by_tool.get(t, f"reads and acts through {t}")}
+        for t in workflow.mcp_tools
+    ]
+    agents.append({"name": "executor", "kind": "LLM", "role": f"judges each item; stops for you under {int(threshold * 100)}%"})
+    notify = workflow.completion.notify or "console"
+    agents.append({"name": "completer", "kind": "SEND", "role": f"{notify} {workflow.completion.channel}".strip() if notify != "console" else "writes the summary"})
+    return {
+        "workflow": workflow,
+        "readable": described.get("readable", workflow.trigger.schedule),
+        "threshold_pct": int(threshold * 100),
+        "signal_name": _signal_name(workflow),
+        "agents": agents,
+    }
+
+
+@app.get("/orb", response_class=HTMLResponse)
+def orb_page(request: Request):
+    """Speak to the workspace and watch what it does, on one page."""
+    from handoff import speech
+    from handoff.chat import get_chat_service
+
+    svc = get_chat_service()
+    workspace = _workspace()
+    chat = svc.voice_chat(workspace.workspace_id)
+    store = get_store()
+    return templates.TemplateResponse(
+        request=request,
+        name="orb.html",
+        context=_context(
+            request,
+            "orb",
+            workspace=workspace,
+            chat=chat,
+            blocks=svc.history(chat.chat_id)[-12:],
+            live_turn=svc.is_busy(chat.chat_id),
+            speech=speech.status(),
+            pending=[_decision_view(p) for p in store.pending_interrupts()][:3],
+        ),
+    )
+
+
+@app.get("/api/orb/chat")
+def orb_chat_id():
+    from handoff.chat import get_chat_service
+
+    workspace = _workspace()
+    chat = get_chat_service().voice_chat(workspace.workspace_id)
+    return {"chat_id": chat.chat_id, "workspace_id": workspace.workspace_id}
+
+
+@app.post("/orb/{chat_id}/send")
+def orb_send(chat_id: str, message: str = Form(...)):
+    """One spoken (or typed) turn on the voice chat. Returns the turn to follow."""
+    from handoff.chat import get_chat_service
+
+    try:
+        turn = get_chat_service().send(chat_id, message)
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except KeyError as exc:
+        raise HTTPException(404, "No such chat") from exc
+    return {"turn": turn, "events": f"/orb/{chat_id}/events?turn={turn}"}
+
+
+@app.get("/orb/{chat_id}/events")
+def orb_events(chat_id: str, turn: int = 0):
+    return chat_events(chat_id, turn)
+
+
+@app.get("/orb/card/{workflow_id}", response_class=HTMLResponse)
+def orb_card(request: Request, workflow_id: str, source: str = "voice"):
+    workflow = get_store().get_workflow(workflow_id)
+    if workflow is None:
+        raise HTTPException(404, "No such workflow")
+    return templates.TemplateResponse(
+        request=request, name="_work_card.html", context={"request": request, "source": source, **_work_card_context(workflow)}
+    )
+
+
 # --- voice ---------------------------------------------------------------------
 
 

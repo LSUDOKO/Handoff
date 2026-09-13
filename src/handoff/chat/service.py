@@ -23,6 +23,7 @@ from strands.session.repository_session_manager import RepositorySessionManager
 from handoff import config, events
 from handoff.agents.builder import BUILDER_PROMPT, extract_config
 from handoff.chat import tools as chat_tools
+from handoff.chat import voice_tools
 from handoff.chat.repository import StoreSessionRepository
 from handoff.graph.hooks.narrator import Narrator
 from handoff.memory.store import recall_preferences, store_user_preference
@@ -54,6 +55,19 @@ you what to do, in which case call decide.
 
 --- Builder's method ---
 """ + BUILDER_PROMPT.split("\n", 1)[1]
+
+VOICE_PROMPT = """You are speaking, not writing. Reply in at most two short sentences of
+plain speech: no markdown, no lists, no code, and never a fenced config.
+
+When someone asks you to set up a chore, do the whole thing in this turn:
+design the config, call activate_workflow with the JSON, and if they said to
+run it call start_run — then tell them in one sentence what you did and when
+it will next run. Ask a question only when the schedule or the destination is
+genuinely unclear; otherwise choose a sensible default and say what you chose.
+
+When a decision is waiting and they tell you what to do, call decide.
+
+""" + ASSISTANT_PROMPT
 
 _FENCE = re.compile(r"```json\s*\{.*?\}\s*```", re.S)
 _BLANKS = re.compile(r"\n{3,}")
@@ -115,6 +129,15 @@ class ChatService:
 
     def list(self, workspace_id: str) -> list[Chat]:
         return get_store().list_chats(workspace_id)
+
+    def voice_chat(self, workspace_id: str) -> Chat:
+        """The one spoken conversation a workspace has; created on first use."""
+        for chat in self.list(workspace_id):
+            if chat.kind == "voice":
+                return chat
+        chat = Chat(workspace_id=workspace_id, title="Voice", kind="voice")
+        get_store().save_chat(chat)
+        return chat
 
     def latest(self, workspace_id: str) -> Chat | None:
         chats = self.list(workspace_id)
@@ -189,7 +212,7 @@ class ChatService:
 
     # -- agent ----------------------------------------------------------------------
 
-    def _agent(self, chat_id: str, turn: int, callback: Any = None) -> Agent:
+    def _agent(self, chat_id: str, turn: int, callback: Any = None, kind: str = "chat") -> Agent:
         tools: list[Any] = [
             chat_tools.workspace_overview,
             chat_tools.recent_runs,
@@ -206,6 +229,11 @@ class ChatService:
             save_workflow,
             list_workflows,
         ]
+        if kind == "voice":
+            # Spoken turns save and start things themselves; the typed chat
+            # leaves saving to a button, so it keeps save_workflow instead.
+            tools = [t for t in tools if getattr(t, "tool_name", "") != "save_workflow"]
+            tools += [voice_tools.activate_workflow, voice_tools.start_run]
         tools += _ready_mcp_tools()
         profile = get_store().get_profile()
         about = (
@@ -216,7 +244,7 @@ class ChatService:
         return Agent(
             model=config.get_model(),
             tools=tools,
-            system_prompt=ASSISTANT_PROMPT + about,
+            system_prompt=(VOICE_PROMPT if kind == "voice" else ASSISTANT_PROMPT) + about,
             agent_id=AGENT_ID,
             name="Handoff",
             description="The workspace assistant",
@@ -271,8 +299,12 @@ class ChatService:
             # copied context, which is what keeps OpenTelemetry's span tokens
             # attached and detached in the same Context. Driving stream_async
             # from a bare asyncio.run here tripped exactly that.
-            agent = self._agent(chat.chat_id, turn, on_event)
-            result = agent(text)
+            agent = self._agent(chat.chat_id, turn, on_event, kind=chat.kind)
+            token = voice_tools.current_channel.set(channel)
+            try:
+                result = agent(text)
+            finally:
+                voice_tools.current_channel.reset(token)
             metrics = getattr(result, "metrics", None)
             acc = getattr(metrics, "accumulated_usage", None) or {}
             usage = {

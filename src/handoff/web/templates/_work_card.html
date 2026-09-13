@@ -1,0 +1,33 @@
+{# The workspace card — what a spoken sentence became. Three panels: the
+   signal that fires it, the job it runs, the agents that do the work. #}
+<article class="work-card" id="card-{{ workflow.workflow_id }}" data-workflow="{{ workflow.workflow_id }}">
+  <header class="wc-head">
+    <span class="wc-crumbs"><span>Workspace</span><i>·</i><span>{{ workflow.name }}</span></span>
+    <span class="wc-when">generated from {{ source or 'voice' }} · <time data-rel datetime="{{ workflow.updated_at.isoformat() }}">just now</time></span>
+  </header>
+  <h2 class="wc-title">{{ workflow.name }}</h2>
+  <div class="wc-grid">
+    <section class="wc-panel">
+      <h3>Signals <span class="wc-count">1</span></h3>
+      <div class="wc-row"><code>{{ signal_name }}</code> <span class="wc-tag schedule">{{ workflow.trigger.type.value|upper if workflow.trigger.type.value != 'cron' else 'SCHEDULE' }}</span></div>
+      {% if workflow.trigger.schedule %}<div class="wc-line"><code class="mono">{{ workflow.trigger.schedule }}</code> · {{ readable }}{% if workflow.trigger.timezone and workflow.trigger.timezone != 'UTC' %} <span class="wc-dim">{{ workflow.trigger.timezone }}</span>{% endif %}</div>
+      {% elif workflow.trigger.type.value == 'webhook' %}<div class="wc-line">fires when a request arrives</div>
+      {% else %}<div class="wc-line">fires when you say so</div>{% endif %}
+      <div class="wc-line wc-dim">triggers · <code>{{ workflow.workflow_id }}</code></div>
+    </section>
+    <section class="wc-panel">
+      <h3>Jobs <span class="wc-count">1</span></h3>
+      <div class="wc-row"><code>{{ workflow.workflow_id }}</code> <span class="wc-tag agent">AGENT</span> <span class="wc-dim ml-auto">on <code>{{ signal_name }}</code></span></div>
+      <p class="wc-line">Runs {% for t in workflow.mcp_tools %}<code>{{ t }}</code>{% if not loop.last %}, {% endif %}{% endfor %}{% if workflow.mcp_tools %} and hands what it finds to the <code>executor</code>, which{% else %}the <code>executor</code>, which{% endif %} acts on anything it is at least {{ threshold_pct }}% sure about and stops for you on the rest{% if workflow.completion.notify and workflow.completion.notify != 'console' %}, then <code>{{ workflow.completion.notify }}</code> reports to <b>{{ workflow.completion.channel or 'you' }}</b>{% endif %}.</p>
+    </section>
+    <section class="wc-panel wc-span">
+      <h3>Agents <span class="wc-count">{{ agents|length }}</span></h3>
+      <ul class="wc-agents">
+        {% for a in agents %}
+        <li><span class="wc-agent-name"><code>{{ a.name }}</code> <span class="wc-tag {{ a.kind|lower }}">{{ a.kind }}</span></span><span class="wc-dim">{{ a.role }}</span></li>
+        {% endfor %}
+      </ul>
+    </section>
+  </div>
+  <p class="wc-foot">From one sentence — a workspace with the <b>signal</b>, <b>agents</b>, and <b>job</b> ready to run.</p>
+</article>

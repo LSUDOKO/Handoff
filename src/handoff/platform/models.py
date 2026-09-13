@@ -339,6 +339,8 @@ class Chat(BaseModel):
     chat_id: str = Field(default_factory=lambda: new_id("chat"))
     workspace_id: str = ""
     agent_id: str = "handoff"
+    #: "chat" is typed; "voice" is the one the orb talks to — one per workspace.
+    kind: str = "chat"
     title: str = "New chat"
     preview: str = ""
     turns: int = 0

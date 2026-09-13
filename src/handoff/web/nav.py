@@ -29,6 +29,7 @@ class NavItem:
 
 #: Global tools, in sidebar order.
 TOOLS: tuple[NavItem, ...] = (
+    NavItem("Talk", "/orb", "i-mic", "orb"),
     NavItem("Chat", "/chat", "i-chat", "chat"),
     NavItem("Memory", "/memory", "i-memory", "memory"),
     NavItem("Activity", "/activity", "i-clock", "activity", badge="pending"),
