@@ -33,7 +33,16 @@ Windows). This guide covers the credentials they share.
 Everything else is pointless until the agent is actually thinking. Pick either
 provider; both run identical agent code.
 
-### Option A — Groq (free tier, also enables voice)
+### Voice comes with whichever you pick
+
+On AWS credentials, the Talk page hears you through Amazon Transcribe and
+answers through Amazon Polly — nothing extra to set up; `handoff doctor speech`
+makes one real call each way. On a Groq key it uses Whisper and Orpheus. With
+neither, the browser's own engines take over. `HANDOFF_SPEECH_PROVIDER` forces
+one (`aws | groq | browser`); the guides at <https://handoff-eya.pages.dev/docs/talk>
+cover the rest.
+
+### Option A — Groq (free tier)
 
 1. <https://console.groq.com> → **API keys** → **Create key**
 2. In `.env`:
