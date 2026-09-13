@@ -362,5 +362,28 @@ def catalogue(workspace_id: str | None = None) -> list[dict[str, Any]]:
                 "gmail": None,
             }
         )
+    rows.append(_speech_row())
     rows.sort(key=lambda r: (r["category"] != "model", not r["connected"], r["label"]))
     return rows
+
+
+def _speech_row() -> dict[str, Any]:
+    """Speech is not a secret you paste — it rides on AWS credentials or the
+    Groq key — so the row is read-only and describes what will hear you."""
+    from handoff import speech
+
+    s = speech.status()
+    labels = {"aws": "Amazon Transcribe + Polly", "groq": "Groq Whisper + Orpheus", "browser": "Browser speech"}
+    hints = {
+        "aws": f"{s['voice']} · {s['engine']} · {s['region']}",
+        "groq": f"{s['engine']} · {s['voice']}",
+        "browser": "No server engine; the browser hears and speaks. Add AWS credentials or a Groq key for real models.",
+    }
+    return {
+        "provider": "speech", "label": labels[s["provider"]], "kind": "service", "category": "voice",
+        "hint": hints[s["provider"]], "help_url": "https://docs.aws.amazon.com/polly/latest/dg/voicelist.html",
+        "prefix": "", "actions": ["hear", "speak"],
+        "connected": s["stt"], "status": "connected" if s["stt"] else "disconnected",
+        "masked": "", "fingerprint": "", "credential_id": "", "last_error": "", "last_checked": "",
+        "from_env_only": True, "gmail": None,
+    }

@@ -31,11 +31,13 @@ Issues = "https://github.com/LSUDOKO/Handoff/issues"
 # Reasoning providers — pick one; the agent code is identical across them.
 groq = ["openai>=1.0.0"]
 anthropic = ["anthropic>=0.40.0"]
-bedrock = ["boto3>=1.35.0"]
+bedrock = ["boto3>=1.35.0", "amazon-transcribe>=0.6.0"]
 # Serverless deployment on Bedrock AgentCore.
 agentcore = ["bedrock-agentcore>=0.1.0"]
 # Native desktop window.
 desktop = ["pywebview>=5.0"]
+# Microphone from the terminal and the desktop window (needs PortAudio).
+voice = ["sounddevice>=0.5"]
 # A credential-free MCP server, so a fresh clone can read a real web page.
 web = ["mcp-server-fetch>=0.1.0"]
 dev = [

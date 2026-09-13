@@ -124,6 +124,44 @@ def check_bedrock() -> dict[str, Any]:
         return _result("AWS Bedrock", FAIL, message[:140], fix)
 
 
+def check_speech() -> dict[str, Any]:
+    """One word through Polly, half a second of silence through Transcribe.
+
+    Both are real calls in the configured region; together they cost well
+    under a hundredth of a cent.
+    """
+    from handoff import speech
+
+    which = speech.provider()
+    if which == "browser":
+        return _result(
+            "Speech", WARN, "no server engine — the browser will hear and speak",
+            "Configure AWS credentials (Transcribe + Polly) or a Groq key",
+        )
+    if which == "groq":
+        audio, _, reason = speech.speak("Ready.")
+        if audio:
+            return _result("Speech", OK, f"Groq {config.GROQ_STT_MODEL} in, {config.GROQ_TTS_MODEL} out")
+        return _result("Speech", FAIL, f"Groq Orpheus: {reason}", "Accept the model terms in the Groq console playground")
+    try:
+        from handoff.speech import aws
+
+        audio = aws.synthesize("Ready.", config.POLLY_VOICE, config.POLLY_ENGINE)
+        if not audio:
+            return _result("Speech", FAIL, "Polly returned no audio", "Check the voice/engine pair")
+        aws.transcribe_pcm(b"\x00" * 16000, 16000, config.TRANSCRIBE_LANGUAGE)
+        return _result(
+            "Speech", OK,
+            f"Polly {config.POLLY_VOICE} ({config.POLLY_ENGINE}) + Transcribe streaming in {config.AWS_REGION}",
+        )
+    except Exception as exc:
+        message = str(exc)
+        fix = "Check the IAM user has polly:SynthesizeSpeech and transcribe:StartStreamTranscription"
+        if "not supported" in message or "ValidationException" in message:
+            fix = f"{config.POLLY_VOICE} may not support engine {config.POLLY_ENGINE} in {config.AWS_REGION}"
+        return _result("Speech", FAIL, message[:140], fix)
+
+
 # --- integrations ----------------------------------------------------------
 
 
@@ -301,6 +339,7 @@ CHECKS = {
     "groq": check_groq,
     "anthropic": check_anthropic,
     "bedrock": check_bedrock,
+    "speech": check_speech,
     "gmail": check_gmail,
     "linear": check_linear,
     "slack": check_slack,
@@ -333,7 +372,8 @@ def report(results: list[dict[str, Any]]) -> int:
     print(f"\n  {len(passes)} working, {len(failures)} broken, "
           f"{len(results) - len(passes) - len(failures)} not configured\n")
 
-    if not any(r["name"] in ("Groq API", "Anthropic API", "AWS Bedrock") and r["status"] == OK for r in results):
+    model_checks = [r for r in results if r["name"] in ("Groq API", "Anthropic API", "AWS Bedrock")]
+    if model_checks and not any(r["status"] == OK for r in model_checks):
         print("  No working model provider. Handoff can only run with")
         print("  HANDOFF_FAKE_MODEL=true until you fix that.\n")
 

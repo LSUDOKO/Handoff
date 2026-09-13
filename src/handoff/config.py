@@ -101,6 +101,14 @@ GROQ_STT_MODEL = os.getenv("GROQ_STT_MODEL", "whisper-large-v3-turbo")
 GROQ_TTS_MODEL = os.getenv("GROQ_TTS_MODEL", "canopylabs/orpheus-v1-english")
 GROQ_TTS_VOICE = os.getenv("GROQ_TTS_VOICE", "troy")
 GROQ_REASONING_EFFORT = os.getenv("GROQ_REASONING_EFFORT", "low")
+
+# --- Speech ------------------------------------------------------------------
+# auto = AWS (Transcribe + Polly) when credentials resolve, else Groq when a
+# key exists, else the browser's own engines. Or name one: aws | groq | browser.
+SPEECH_PROVIDER = os.getenv("HANDOFF_SPEECH_PROVIDER", "auto").lower()
+POLLY_VOICE = os.getenv("POLLY_VOICE", "Matthew")
+POLLY_ENGINE = os.getenv("POLLY_ENGINE", "neural")  # neural | generative | standard
+TRANSCRIBE_LANGUAGE = os.getenv("TRANSCRIBE_LANGUAGE", "en-US")
 #: Groq's streaming pipeline rejects tool calls whose JSON it can't parse
 #: mid-stream ("Failed to parse tool call arguments as JSON"), which
 #: open-weight models trip over on long string arguments. Non-streaming

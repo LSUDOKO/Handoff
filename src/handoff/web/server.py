@@ -800,11 +800,11 @@ def live_panel(request: Request, run_id: str):
 
 @app.post("/api/voice/transcribe")
 async def voice_transcribe(audio: Annotated[UploadFile, File()]):
-    """Speech → text through Groq Whisper. The browser records; we transcribe."""
+    """Speech → text. The browser records 16 kHz WAV; Transcribe or Whisper hears it."""
     data = await audio.read()
     if not data:
         raise HTTPException(400, "empty recording")
-    result = transcribe(data, filename=audio.filename or "speech.webm")
+    result = transcribe(data, filename=audio.filename or "speech.wav")
     if result.get("error"):
         raise HTTPException(502, result["error"])
     return JSONResponse(result)
@@ -812,11 +812,11 @@ async def voice_transcribe(audio: Annotated[UploadFile, File()]):
 
 @app.post("/api/voice/speak")
 def voice_speak(body: dict):
-    """Text → speech through Groq Orpheus. 204 means: use the browser's voice."""
-    audio, reason = speak(str(body.get("text", "")))
+    """Text → speech through Polly, Orpheus, or 204 meaning: use the browser's voice."""
+    audio, mime, reason = speak(str(body.get("text", "")), body.get("voice") or None)
     if audio is None:
         return Response(status_code=204, headers={"X-Handoff-Fallback": reason})
-    return Response(content=audio, media_type="audio/wav")
+    return Response(content=audio, media_type=mime, headers={"Cache-Control": "no-store"})
 
 
 @app.post("/api/voice/command")
@@ -828,7 +828,9 @@ def voice_command(body: dict):
 
 @app.get("/api/voice/status")
 def voice_status():
-    return JSONResponse({"stt": stt_available(), "tts_model": config.GROQ_TTS_MODEL})
+    from handoff import speech
+
+    return JSONResponse(speech.status())
 
 
 # --- templates -------------------------------------------------------------------
@@ -1237,6 +1239,19 @@ def credentials_gmail_auth(request: Request):
     if result["ok"]:
         return _credentials_fragment(request, result["message"], "ok")
     return _credentials_fragment(request, result["error"], "bad")
+
+
+@app.post("/credentials/speech/check", response_class=HTMLResponse)
+def credentials_speech_check(request: Request):
+    """Say one word and hear half a second of silence — a real round trip."""
+    from handoff import doctor
+
+    result = doctor.check_speech()
+    flash = f"{result['name']}: {result['detail']}" + (f" — {result['fix']}" if result.get("fix") and result["status"] != "ok" else "")
+    return templates.TemplateResponse(
+        request=request, name="_credentials_list.html",
+        context={"credentials": creds.catalogue(), "flash": flash, "flash_kind": "error" if result["status"] == "fail" else "ok"},
+    )
 
 
 @app.post("/credentials/connect", response_class=HTMLResponse)
