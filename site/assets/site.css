@@ -263,6 +263,7 @@ p { margin: 0; }
   -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 75%), linear-gradient(to bottom, black 60%, transparent);
   -webkit-mask-composite: source-in;
 }
+@media (max-width: 640px) { .drift { opacity: 0.13; } }
 .drift-lane { display: flex; flex-direction: column; gap: 16px; width: 150px; flex-shrink: 0; will-change: transform; }
 @keyframes drift-up { from { transform: translateY(0); } to { transform: translateY(-50%); } }
 @keyframes drift-down { from { transform: translateY(-50%); } to { transform: translateY(0); } }
