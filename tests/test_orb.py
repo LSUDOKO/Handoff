@@ -168,3 +168,16 @@ class TestOrbRoutes:
         assert r.status_code == 200
         for word in ("Signals", "Jobs", "Agents", "MCP", "LLM", "SEND", triage_workflow.trigger.schedule):
             assert word in r.text, word
+
+
+class TestVoiceStream:
+    def test_stream_says_unsupported_without_aws(self, monkeypatch):
+        from fastapi.testclient import TestClient
+
+        from handoff import config
+        from handoff.web.server import app
+
+        monkeypatch.setattr(config, "SPEECH_PROVIDER", "browser")
+        c = TestClient(app)
+        with c.websocket_connect("/api/voice/stream") as ws:
+            assert ws.receive_json()["type"] == "unsupported"

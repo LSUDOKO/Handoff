@@ -15,7 +15,9 @@ cached so they cost nothing the second time.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 from functools import lru_cache
+from typing import Any
 
 from handoff import config
 
@@ -34,38 +36,92 @@ def ready() -> bool:
         return False
 
 
+class LiveTranscription:
+    """One open Transcribe streaming session: PCM in, text out, as it comes.
+
+    The orb page keeps one of these per utterance, feeding microphone frames
+    over a WebSocket while the person is still talking, so the caption fills
+    in live and the final text is ready the moment they stop.
+    """
+
+    def __init__(self, stream: Any) -> None:
+        self.stream = stream
+        self._finals: list[str] = []
+        self._queue: asyncio.Queue = asyncio.Queue()
+        self._reader: asyncio.Task | None = None
+
+    @classmethod
+    async def open(cls, rate: int = 16000, language: str = "en-US") -> LiveTranscription:
+        from amazon_transcribe.client import TranscribeStreamingClient
+
+        client = TranscribeStreamingClient(region=config.AWS_REGION)
+        stream = await client.start_stream_transcription(
+            language_code=language,
+            media_sample_rate_hz=rate,
+            media_encoding="pcm",
+            enable_partial_results_stabilization=True,
+            partial_results_stability="high",
+        )
+        session = cls(stream)
+        session._reader = asyncio.create_task(session._read())
+        return session
+
+    async def _read(self) -> None:
+        from amazon_transcribe.handlers import TranscriptResultStreamHandler
+
+        queue, finals = self._queue, self._finals
+
+        class Handler(TranscriptResultStreamHandler):
+            async def handle_transcript_event(self, transcript_event: Any) -> None:
+                for result in transcript_event.transcript.results:
+                    for alt in result.alternatives:
+                        if not alt.transcript:
+                            continue
+                        if result.is_partial:
+                            await queue.put((alt.transcript, True))
+                        else:
+                            finals.append(alt.transcript)
+                            await queue.put((alt.transcript, False))
+
+        try:
+            await Handler(self.stream.output_stream).handle_events()
+        finally:
+            await queue.put(None)
+
+    async def send(self, chunk: bytes) -> None:
+        await self.stream.input_stream.send_audio_event(audio_chunk=chunk)
+
+    async def end(self) -> None:
+        await self.stream.input_stream.end_stream()
+
+    async def results(self) -> AsyncIterator[tuple[str, bool]]:
+        """Yield ``(text, is_partial)`` until the stream closes."""
+        while True:
+            item = await self._queue.get()
+            if item is None:
+                return
+            yield item
+
+    def transcript(self) -> str:
+        return " ".join(self._finals).strip()
+
+    async def close(self) -> None:
+        if self._reader and not self._reader.done():
+            self._reader.cancel()
+
+
 async def _stream(pcm: bytes, rate: int, language: str) -> str:
-    from amazon_transcribe.client import TranscribeStreamingClient
-    from amazon_transcribe.handlers import TranscriptResultStreamHandler
-    from amazon_transcribe.model import TranscriptEvent
-
-    client = TranscribeStreamingClient(region=config.AWS_REGION)
-    stream = await client.start_stream_transcription(
-        language_code=language,
-        media_sample_rate_hz=rate,
-        media_encoding="pcm",
-        enable_partial_results_stabilization=True,
-        partial_results_stability="high",
-    )
-    finals: list[str] = []
-
-    class Handler(TranscriptResultStreamHandler):
-        async def handle_transcript_event(self, transcript_event: TranscriptEvent) -> None:
-            for result in transcript_event.transcript.results:
-                if result.is_partial:
-                    continue
-                for alt in result.alternatives:
-                    if alt.transcript:
-                        finals.append(alt.transcript)
-
-    async def send() -> None:
+    session = await LiveTranscription.open(rate, language)
+    try:
         for i in range(0, len(pcm), CHUNK_BYTES):
-            await stream.input_stream.send_audio_event(audio_chunk=pcm[i : i + CHUNK_BYTES])
+            await session.send(pcm[i : i + CHUNK_BYTES])
             await asyncio.sleep(0)
-        await stream.input_stream.end_stream()
-
-    await asyncio.gather(send(), Handler(stream.output_stream).handle_events())
-    return " ".join(finals).strip()
+        await session.end()
+        async for _ in session.results():
+            pass
+        return session.transcript()
+    finally:
+        await session.close()
 
 
 def transcribe_pcm(pcm: bytes, rate: int = 16000, language: str = "en-US") -> str:

@@ -10,6 +10,7 @@ The decision screen is the one that matters. Everything else is reporting.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import threading
 from datetime import UTC, datetime
@@ -18,7 +19,16 @@ from typing import Annotated, Any
 
 UI_DIR = Path(__file__).resolve().parent
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile  # noqa: E402
+from fastapi import (  # noqa: E402
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.responses import (  # noqa: E402
     HTMLResponse,
     JSONResponse,
@@ -863,7 +873,7 @@ def orb_page(request: Request):
             blocks=svc.history(chat.chat_id)[-12:],
             live_turn=svc.is_busy(chat.chat_id),
             speech=speech.status(),
-            pending=[_decision_view(p) for p in store.pending_interrupts()][:3],
+            pending=[_decision_context(request, p) for p in store.pending_interrupts()][:3],
         ),
     )
 
@@ -928,6 +938,69 @@ def voice_speak(body: dict):
     if audio is None:
         return Response(status_code=204, headers={"X-Handoff-Fallback": reason})
     return Response(content=audio, media_type=mime, headers={"Cache-Control": "no-store"})
+
+
+@app.websocket("/api/voice/stream")
+async def voice_stream(websocket: WebSocket):
+    """Hear while they are still talking.
+
+    16 kHz Int16 PCM frames come in as binary messages; ``partial`` and
+    ``final`` text goes out as they are recognised; a ``{"type": "end"}``
+    text message closes the utterance and a ``done`` message carries the
+    whole transcript. Only AWS streams; the page falls back to an upload
+    when it hears ``unsupported``.
+    """
+    from handoff import speech
+    from handoff.speech import aws
+
+    await websocket.accept()
+    if speech.provider() != "aws":
+        await websocket.send_json({"type": "unsupported", "provider": speech.provider()})
+        await websocket.close()
+        return
+    try:
+        session = await aws.LiveTranscription.open(rate=16000, language=config.TRANSCRIBE_LANGUAGE)
+    except Exception as exc:
+        await websocket.send_json({"type": "error", "text": str(exc)[:160]})
+        await websocket.close()
+        return
+
+    async def pump() -> None:
+        async for text, partial in session.results():
+            await websocket.send_json({"type": "partial" if partial else "final", "text": text})
+
+    pump_task = asyncio.create_task(pump())
+    try:
+        while True:
+            message = await websocket.receive()
+            if message.get("type") == "websocket.disconnect":
+                break
+            if message.get("bytes"):
+                await session.send(message["bytes"])
+            elif message.get("text"):
+                try:
+                    event = json.loads(message["text"])
+                except ValueError:
+                    event = {}
+                if event.get("type") == "end":
+                    await session.end()
+                    await asyncio.wait_for(pump_task, timeout=15)
+                    await websocket.send_json({"type": "done", "text": session.transcript()})
+                    break
+    except WebSocketDisconnect:
+        pass
+    except Exception as exc:
+        try:
+            await websocket.send_json({"type": "error", "text": str(exc)[:160]})
+        except Exception:
+            pass
+    finally:
+        pump_task.cancel()
+        await session.close()
+        try:
+            await websocket.close()
+        except Exception:
+            pass
 
 
 @app.post("/api/voice/command")
