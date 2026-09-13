@@ -8,7 +8,8 @@ import argparse
 import json
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """The command tree. Exposed so the docs can render a reference from it."""
     parser = argparse.ArgumentParser(
         prog="handoff", description="Describe it. Hand it off. It runs."
     )
@@ -52,7 +53,11 @@ def main(argv: list[str] | None = None) -> int:
     p_doctor.add_argument(
         "checks", nargs="*", help="Only run these (e.g. gmail linear slack)"
     )
+    return parser
 
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
     args = parser.parse_args(argv)
 
     from handoff import config
