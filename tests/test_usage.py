@@ -96,3 +96,47 @@ def test_inference_profile_prefixes_do_not_hide_the_price():
 
 def test_an_unknown_model_is_free_rather_than_a_crash():
     assert estimate_cost("some.model-nobody-priced", 1_000_000, 1_000_000) == 0.0
+
+
+class _FakeModel:
+    def __init__(self, model_id: str) -> None:
+        self._model_id = model_id
+
+    def get_config(self) -> dict[str, Any]:
+        return {"model_id": self._model_id}
+
+
+@dataclass
+class _Agent:
+    model: Any
+
+
+@dataclass
+class _EventWithAgent:
+    stop_response: Any
+    agent: Any
+
+
+def test_tokens_are_attributed_to_the_model_that_served_them():
+    """A fallback-model step must not be billed to the primary model."""
+    recorder = _recorder()
+    recorder._record_usage(
+        _EventWithAgent(
+            _stop_response({"inputTokens": 50, "outputTokens": 10}),
+            _Agent(_FakeModel("apac.amazon.nova-lite-v1:0")),
+        )
+    )
+
+    from handoff.store import get_store
+
+    assert get_store().list_usage()[0].model == "apac.amazon.nova-lite-v1:0"
+
+
+def test_attribution_falls_back_to_config_when_the_model_is_unknown():
+    from handoff import config
+    from handoff.store import get_store
+
+    recorder = _recorder()
+    recorder._record_usage(_Event(_stop_response({"inputTokens": 5, "outputTokens": 1})))
+
+    assert get_store().list_usage()[0].model == config.active_model_id()

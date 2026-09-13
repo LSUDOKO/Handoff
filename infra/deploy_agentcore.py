@@ -122,6 +122,33 @@ def build_and_push() -> str:
     return uri
 
 
+def runtime_env() -> list[str]:
+    """The settings the deployed agent needs that the image must not carry.
+
+    A Runtime container's filesystem is ephemeral, so the local JSON store
+    would lose every run between invocations — the deployment has to be told to
+    use DynamoDB and AgentCore Memory. These are passed at launch rather than
+    baked into the image because the memory id and table name are specific to
+    one account, and an image is a thing you might publish.
+    """
+    settings = {
+        "HANDOFF_MODEL_PROVIDER": "bedrock",
+        "AWS_REGION": config.AWS_REGION,
+        "BEDROCK_MODEL_ID": config.BEDROCK_MODEL_ID,
+        "BEDROCK_FALLBACK_MODEL_ID": config.BEDROCK_FALLBACK_MODEL_ID,
+        "USE_DYNAMODB": str(config.USE_DYNAMODB).lower(),
+        "DDB_TABLE": config.DDB_TABLE,
+        "USE_AGENTCORE_MEMORY": str(config.USE_AGENTCORE_MEMORY).lower(),
+        "AGENTCORE_MEMORY_ID": config.AGENTCORE_MEMORY_ID,
+        "USE_MOCK_TOOLS": str(config.USE_MOCK_TOOLS).lower(),
+    }
+    flags: list[str] = []
+    for key, value in settings.items():
+        if value:
+            flags += ["--env", f"{key}={value}"]
+    return flags
+
+
 def launch() -> None:
     print("\n[4/4] AgentCore Runtime")
     run(
@@ -129,7 +156,15 @@ def launch() -> None:
          "--name", AGENT_NAME, "--region", config.AWS_REGION],
         check=False,
     )
-    run([which("agentcore") or "agentcore", "launch"], check=False)
+
+    if not config.USE_DYNAMODB:
+        print(
+            "  note: USE_DYNAMODB is false — the deployed agent will keep state on\n"
+            "        an ephemeral container filesystem and lose it between calls.\n"
+            "        Run infra/dynamodb_setup.py and set USE_DYNAMODB=true."
+        )
+
+    run([which("agentcore") or "agentcore", "launch", *runtime_env()], check=False)
 
 
 def invoke() -> None:

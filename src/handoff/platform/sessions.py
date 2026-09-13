@@ -65,6 +65,23 @@ def _result_text(result: Any) -> tuple[str, str]:
     return _summarise(result), "ok"
 
 
+def _model_id(event: AfterModelCallEvent) -> str:
+    """Which model actually served this call.
+
+    Not the configured one: steps that ask for the cheaper model are served by
+    ``BEDROCK_FALLBACK_MODEL_ID``, and attributing their tokens to the primary
+    makes the per-model cost breakdown quietly wrong — which is the only thing
+    that page is for.
+    """
+    model = getattr(getattr(event, "agent", None), "model", None)
+    if model is None:
+        return ""
+    try:
+        return str(model.get_config().get("model_id") or "")
+    except Exception:
+        return str(getattr(model, "model_id", "") or "")
+
+
 class SessionRecorder(HookProvider):
     """Captures a run's steps. One per run; attach to every agent in it."""
 
@@ -211,7 +228,7 @@ class SessionRecorder(HookProvider):
             workspace_id=self.session.workspace_id,
             run_id=self.session.run_id,
             provider=config.active_provider(),
-            model=config.active_model_id(),
+            model=_model_id(event) or config.active_model_id(),
             input_tokens=field("inputTokens", "input_tokens", "prompt_tokens"),
             output_tokens=field("outputTokens", "output_tokens", "completion_tokens"),
         )

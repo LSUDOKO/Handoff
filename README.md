@@ -240,12 +240,12 @@ payload — so pin the version before changing anything in the gate.
 
 | Service | Purpose |
 |---|---|
-| Amazon Bedrock (Claude Sonnet 4.5 / Nova) | reasoning for all three agents |
+| Amazon Bedrock (Amazon Nova / Claude Sonnet 4.5) | reasoning for all three agents |
 | AgentCore Runtime | serverless background execution, long-running invocations |
 | AgentCore Memory | learned preferences across runs |
 | AgentCore Browser | the competitor-pricing workflow |
 | AgentCore Observability | OTEL traces → CloudWatch |
-| DynamoDB | workflow configs, runs, interrupts, audit trail |
+| DynamoDB | one table, partitioned by collection — configs, runs, interrupts, sessions, usage, audit |
 | EventBridge Scheduler | cron triggers |
 | SNS | "a decision is waiting" notifications |
 
@@ -259,6 +259,16 @@ python infra/eventbridge_setup.py --list    # preview the schedules
 
 Every store has a local JSON backend, so none of this is required to run, test
 or demo the project — only to deploy it.
+
+**Two things Bedrock will tell you confusingly.** Model ids are not bare: a
+current model is reached through a cross-region inference profile prefixed by
+geography (`us.`, `apac.`, `eu.`), and the prefix must match the region you
+call from — so Handoff resolves a bare id against `AWS_REGION` rather than
+hardcoding one. And Anthropic models on Bedrock are sold through AWS
+Marketplace while Amazon's own are not, so an account that cannot complete a
+Marketplace agreement gets `INVALID_PAYMENT_INSTRUMENT` on Claude in *every*
+region and works fine on Nova. That is why the default is Nova Pro.
+[`docs/SETUP.md`](docs/SETUP.md) has the long version.
 
 ---
 
