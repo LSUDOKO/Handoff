@@ -128,35 +128,34 @@ def check_bedrock() -> dict[str, Any]:
 
 
 def check_gmail() -> dict[str, Any]:
-    token = config.GMAIL_OAUTH_TOKEN
-    if not token:
+    """Gmail has no bearer token to check — its MCP server owns its own
+    OAuth and refreshes itself from a file on disk. The only honest check is
+    to actually start that server and ask it what it can do, which is
+    exactly what a real run would do."""
+    from handoff.platform.credentials import gmail_oauth_keys_path, gmail_status
+
+    status = gmail_status()
+    if not status["npx_available"]:
+        return _result("Gmail", WARN, "npx not found", "Install Node.js — the Gmail MCP server needs it")
+    if not status["keys_present"]:
         return _result(
-            "Gmail",
-            WARN,
-            "no token set",
-            "Set GMAIL_OAUTH_TOKEN in .env — see docs/SETUP.md, step 2",
+            "Gmail", WARN, "not set up",
+            f"Download the OAuth client JSON from Google Cloud Console and save it "
+            f"as {gmail_oauth_keys_path()}, then sign in — see docs/SETUP.md, step 2",
+        )
+    if not status["signed_in"]:
+        return _result(
+            "Gmail", WARN, "OAuth client is set up, not signed in yet",
+            "Connect Gmail from the Credentials page (one browser click) or run: "
+            "npx -y @gongrzhe/server-gmail-autoauth-mcp auth",
         )
     try:
-        import httpx
+        from handoff.mcp.servers import get_client
 
-        response = httpx.get(
-            "https://gmail.googleapis.com/gmail/v1/users/me/profile",
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=15.0,
-        )
-        if response.status_code == 200:
-            profile = response.json()
-            return _result(
-                "Gmail", OK, f"{profile.get('emailAddress')} "
-                f"({profile.get('messagesTotal', '?')} messages)"
-            )
-        if response.status_code == 401:
-            return _result(
-                "Gmail", FAIL, "token rejected (401)", "The token is expired — reconnect Gmail"
-            )
-        return _result("Gmail", FAIL, f"{response.status_code}: {response.text[:100]}")
+        tools = get_client("gmail").list_tools_sync()
+        return _result("Gmail", OK, f"signed in — {len(tools)} tools live")
     except Exception as exc:
-        return _result("Gmail", FAIL, str(exc)[:140])
+        return _result("Gmail", FAIL, str(exc)[:140], "Try signing in again from the Credentials page")
 
 
 def check_linear() -> dict[str, Any]:

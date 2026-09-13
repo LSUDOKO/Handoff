@@ -42,10 +42,20 @@ class MCPServerSpec:
     #: A Python module that must be importable for this server to launch.
     python_module: str = ""
 
+    #: A file (``~`` expanded) whose existence proves this server is set up.
+    #: Gmail's MCP server does its own OAuth and writes a long-lived,
+    #: auto-refreshing token file here — there is no env var to check.
+    require_file: str = ""
+
     @property
     def configured(self) -> bool:
         if self.python_module:
             return importlib.util.find_spec(self.python_module) is not None
+        if self.require_file:
+            from pathlib import Path
+
+            if not Path(self.require_file).expanduser().exists():
+                return False
         if self.transport == "stdio" and self.command:
             if shutil.which(self.command) is None:
                 return False
@@ -59,7 +69,10 @@ MCP_SERVERS: dict[str, MCPServerSpec] = {
         actions=["search_threads", "get_message", "archive", "create_draft", "send", "add_label"],
         command="npx",
         args=["-y", "@gongrzhe/server-gmail-autoauth-mcp"],
-        required_env=["GMAIL_OAUTH_TOKEN"],
+        # No env var: the package does its own OAuth (browser popup, once)
+        # and writes a refreshing token to this file. See
+        # handoff.platform.credentials.run_gmail_auth.
+        require_file="~/.gmail-mcp/credentials.json",
     ),
     "linear": MCPServerSpec(
         name="linear",

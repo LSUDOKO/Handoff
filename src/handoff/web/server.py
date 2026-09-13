@@ -1225,6 +1225,20 @@ def credentials_page(request: Request):
     return _credentials_page(request)
 
 
+@app.post("/credentials/gmail/auth", response_class=HTMLResponse)
+def credentials_gmail_auth(request: Request):
+    """Run the Gmail MCP server's own OAuth flow — a browser popup, once.
+
+    Blocks for the duration (the user is off approving a Google consent
+    screen), which is fine here: it's a single click from a page they're
+    already looking at, not a background job.
+    """
+    result = creds.run_gmail_auth()
+    if result["ok"]:
+        return _credentials_fragment(request, result["message"], "ok")
+    return _credentials_fragment(request, result["error"], "bad")
+
+
 @app.post("/credentials/connect", response_class=HTMLResponse)
 def credentials_connect(
     request: Request, provider: str = Form(...), secret: str = Form("")

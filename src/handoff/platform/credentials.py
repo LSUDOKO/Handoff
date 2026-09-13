@@ -16,8 +16,10 @@ store, into the process environment.
 from __future__ import annotations
 
 import os
+import shutil
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from handoff.platform.models import Credential, CredentialKind, CredentialStatus
@@ -55,8 +57,8 @@ PROVIDERS: dict[str, Provider] = {
     "gmail": Provider(
         "gmail", "Gmail", CredentialKind.OAUTH, "GMAIL_OAUTH_TOKEN",
         "https://console.cloud.google.com",
-        "Needs the gmail.modify scope — read, archive, label, draft. Cannot send.",
-        "ya29.", "gmail", "integration",
+        "One-time Google sign-in — no key to paste. Scope: gmail.modify (read, archive, label, draft; never send).",
+        "", "gmail", "integration",
         ["search_threads", "archive", "create_draft", "add_label"],
     ),
     "linear": Provider(
@@ -91,6 +93,92 @@ PROVIDERS: dict[str, Provider] = {
 
 def provider(key: str) -> Provider | None:
     return PROVIDERS.get(key)
+
+
+# --- Gmail: a one-time browser sign-in instead of a pasted key -------------
+#
+# The Gmail MCP server (@gongrzhe/server-gmail-autoauth-mcp) does its own
+# OAuth: it opens a browser once, then writes a refresh token to disk that it
+# renews on every call forever after. There is no bearer token to copy into
+# this app — asking for one would mean pasting something that expires within
+# the hour and breaks the first scheduled run after that.
+
+
+def gmail_mcp_dir() -> Path:
+    return Path.home() / ".gmail-mcp"
+
+
+def gmail_oauth_keys_path() -> Path:
+    """Where the downloaded Google Cloud OAuth client JSON must be placed."""
+    return gmail_mcp_dir() / "gcp-oauth.keys.json"
+
+
+def gmail_credentials_path() -> Path:
+    """Where the MCP server writes its refreshing token, once signed in."""
+    return gmail_mcp_dir() / "credentials.json"
+
+
+def gmail_status() -> dict[str, Any]:
+    """What the UI needs to render the Gmail row without a stored secret."""
+    keys_present = gmail_oauth_keys_path().exists()
+    signed_in = gmail_credentials_path().exists()
+    return {
+        "keys_present": keys_present,
+        "signed_in": signed_in,
+        "keys_path": str(gmail_oauth_keys_path()),
+        "npx_available": bool(shutil.which("npx")),
+    }
+
+
+def run_gmail_auth(timeout: float = 180.0) -> dict[str, Any]:
+    """Run the Gmail MCP server's own OAuth flow.
+
+    Opens the user's browser for the Google consent screen; blocks until they
+    finish (or the timeout hits). Requires the OAuth client JSON downloaded
+    from Google Cloud Console to already be at ``gmail_oauth_keys_path()`` —
+    that one manual step still needs a browser, because it is the step that
+    creates the app Google is asking permission for.
+    """
+    import subprocess
+
+    if shutil.which("npx") is None:
+        return {
+            "ok": False,
+            "error": "npx not found — Node.js is required to run the Gmail MCP server.",
+        }
+
+    keys_path = gmail_oauth_keys_path()
+    if not keys_path.exists():
+        return {
+            "ok": False,
+            "error": (
+                f"No OAuth client file at {keys_path}. Download it from Google Cloud "
+                "Console (Credentials → your OAuth client → Download JSON) and save it "
+                "there first."
+            ),
+        }
+
+    try:
+        result = subprocess.run(
+            ["npx", "-y", "@gongrzhe/server-gmail-autoauth-mcp", "auth"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "ok": False,
+            "error": "Timed out waiting for the browser sign-in. Run it again and finish the Google consent screen.",
+        }
+
+    if gmail_credentials_path().exists():
+        return {"ok": True, "message": "Signed in — Gmail tools are ready."}
+
+    tail = (result.stderr or result.stdout or "").strip().splitlines()
+    return {
+        "ok": False,
+        "error": "Sign-in did not complete. " + (tail[-1] if tail else "See the terminal for details."),
+    }
 
 
 # --- applying credentials to the process ------------------------------------
@@ -233,7 +321,26 @@ def catalogue(workspace_id: str | None = None) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for key, spec in PROVIDERS.items():
         cred = by_provider.get(key)
-        in_env = bool(os.environ.get(spec.env_var))
+        in_env = bool(spec.env_var and os.environ.get(spec.env_var))
+
+        if key == "gmail":
+            # No secret is ever stored for Gmail — it's a file on disk that
+            # the MCP server's own OAuth flow writes and refreshes itself.
+            gmail = gmail_status()
+            rows.append(
+                {
+                    "provider": key, "label": spec.label, "kind": spec.kind.value,
+                    "category": spec.category, "hint": spec.hint, "help_url": spec.help_url,
+                    "prefix": spec.prefix, "actions": spec.actions,
+                    "connected": gmail["signed_in"],
+                    "status": "connected" if gmail["signed_in"] else "disconnected",
+                    "masked": str(gmail_credentials_path()) if gmail["signed_in"] else "",
+                    "fingerprint": "", "credential_id": "", "last_error": "", "last_checked": "",
+                    "from_env_only": False, "gmail": gmail,
+                }
+            )
+            continue
+
         rows.append(
             {
                 "provider": key,
@@ -252,6 +359,7 @@ def catalogue(workspace_id: str | None = None) -> list[dict[str, Any]]:
                 "last_error": cred.last_error if cred else "",
                 "last_checked": cred.last_checked.isoformat() if cred and cred.last_checked else "",
                 "from_env_only": in_env and not cred,
+                "gmail": None,
             }
         )
     rows.sort(key=lambda r: (r["category"] != "model", not r["connected"], r["label"]))

@@ -142,7 +142,12 @@ still mocked; that's Step 2.
 
 ## Step 2 — Make the inbox real (Gmail)
 
-The heaviest step, because Google's OAuth requires a project.
+The heaviest step, because Google's OAuth requires a project — but there is
+**no key to paste into `.env`**. The Gmail MCP server
+(`@gongrzhe/server-gmail-autoauth-mcp`) does its own OAuth: one browser
+sign-in, then it refreshes itself forever. A pasted access token would expire
+within the hour and break the next morning's scheduled run, so Handoff
+doesn't ask for one.
 
 Handoff asks for the `gmail.modify` scope — read, archive, label, draft. It
 cannot send mail, by design.
@@ -151,12 +156,13 @@ cannot send mail, by design.
 2. **APIs & Services** → **Library** → enable **Gmail API**
 3. **OAuth consent screen** → External → add yourself as a test user
 4. **Credentials** → **Create credentials** → **OAuth client ID** → Desktop app
-5. Download the client JSON
-6. Run the OAuth flow once to mint a token with scope
-   `https://www.googleapis.com/auth/gmail.modify`
-7. `GMAIL_OAUTH_TOKEN=ya29...` in `.env`
-8. `python -m handoff.cli doctor gmail` — it prints your address and message
-   count, so you know it's your real mailbox
+5. Download the client JSON and save it as `~/.gmail-mcp/gcp-oauth.keys.json`
+   (create the folder if it doesn't exist)
+6. Open **Credentials** in Handoff → **Gmail** → **Sign in with Google** —
+   this opens your browser for the consent screen once
+   — or from a terminal: `npx -y @gongrzhe/server-gmail-autoauth-mcp auth`
+7. `handoff doctor gmail` — it starts the real MCP server and reports how
+   many tools came back live
 
 > If you embed Handoff in a host runtime that already holds a Gmail token, skip
 > all of this: it uses the host's credential instead. See `handoff.host`.
