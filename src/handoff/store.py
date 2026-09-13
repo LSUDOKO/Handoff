@@ -34,6 +34,19 @@ from handoff.models import (
     WorkflowConfig,
     WorkflowRun,
 )
+from handoff.platform.models import (
+    Artifact,
+    Credential,
+    CustomAgent,
+    MCPServerConfig,
+    MemoryEntry,
+    MemoryStore,
+    Schedule,
+    Session,
+    Skill,
+    UsageRecord,
+    Workspace,
+)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -118,51 +131,83 @@ class JsonCollection:
 class DynamoCollection:
     """DynamoDB-backed twin of :class:`JsonCollection`.
 
-    Deliberately thin: Handoff's access patterns are "get one by id" and "scan
-    a small table", which is all the demo and the dashboard need.
+    Single-table design: every collection lives in one table, partitioned by
+    collection name. ``pk`` is the collection, ``sk`` is the item's id.
+
+    This matters for more than tidiness. The obvious alternative — several
+    collections sharing a table keyed on one id field — cannot work, because
+    each collection has its own id attribute (``run_id``, ``skill_id``,
+    ``usage_id``), and a table has exactly one key schema. Writes fail on the
+    missing key, and listing degrades to a table Scan that hands one
+    collection's rows to another collection's model. Partitioning by name
+    makes listing a Query, so that cannot happen.
     """
 
-    def __init__(self, table_name: str, model: type[T], key_field: str) -> None:
+    def __init__(
+        self, table_name: str, model: type[T], key_field: str, collection: str
+    ) -> None:
         import boto3
 
         self.model = model
         self.key_field = key_field
+        self.collection = collection
         self._table = boto3.resource(
             "dynamodb", region_name=config.AWS_REGION
         ).Table(table_name)
+
+    def _key(self, key: str) -> dict[str, str]:
+        return {"pk": self.collection, "sk": str(key)}
 
     @staticmethod
     def _clean(payload: dict) -> dict:
         """DynamoDB rejects floats; round-trip through JSON strings instead."""
         return json.loads(json.dumps(payload, default=_json_default), parse_float=str)
 
+    def _load(self, item: dict) -> T:
+        """Rebuild the model, dropping the keys we added on the way in."""
+        return self.model.model_validate(
+            {k: v for k, v in item.items() if k not in ("pk", "sk")}
+        )
+
     def all(self) -> list[T]:
-        items = self._table.scan().get("Items", [])
-        return [self.model.model_validate(i) for i in items]
+        from boto3.dynamodb.conditions import Key
+
+        items: list[dict] = []
+        kwargs: dict = {"KeyConditionExpression": Key("pk").eq(self.collection)}
+        while True:
+            response = self._table.query(**kwargs)
+            items += response.get("Items", [])
+            start = response.get("LastEvaluatedKey")
+            if not start:
+                break
+            # Paginate. A run's audit trail outgrows one page long before
+            # anyone notices the list has quietly stopped at 1MB.
+            kwargs["ExclusiveStartKey"] = start
+        return [self._load(item) for item in items]
 
     def get(self, key_field: str, key: str) -> T | None:
-        resp = self._table.get_item(Key={key_field: key})
-        item = resp.get("Item")
-        return self.model.model_validate(item) if item else None
+        item = self._table.get_item(Key=self._key(key)).get("Item")
+        return self._load(item) if item else None
 
     def put(self, item: T, key_field: str) -> T:
-        self._table.put_item(Item=self._clean(json.loads(item.model_dump_json())))
+        payload = self._clean(json.loads(item.model_dump_json()))
+        self._table.put_item(Item={**payload, **self._key(payload[key_field])})
         return item
 
     def append(self, item: T) -> T:
         return self.put(item, self.key_field)
 
     def delete(self, key_field: str, key: str) -> bool:
-        self._table.delete_item(Key={key_field: key})
+        self._table.delete_item(Key=self._key(key))
         return True
 
     def clear(self) -> None:  # pragma: no cover - never called against AWS
         raise NotImplementedError("refusing to truncate a DynamoDB table")
 
 
-def _collection[M: BaseModel](name: str, model: type[M], key_field: str, table: str):
+def _collection[M: BaseModel](name: str, model: type[M], key_field: str):
     if config.USE_DYNAMODB:
-        return DynamoCollection(table, model, key_field)
+        return DynamoCollection(config.DDB_TABLE, model, key_field, name)
     return JsonCollection(name, model)
 
 
@@ -174,16 +219,47 @@ class Store:
 
     def __init__(self) -> None:
         self.workflows = _collection(
-            "workflows", WorkflowConfig, "workflow_id", config.DDB_WORKFLOWS_TABLE
-        )
-        self.runs = _collection("runs", WorkflowRun, "run_id", config.DDB_AUDIT_TABLE)
+            "workflows", WorkflowConfig, "workflow_id")
+        self.runs = _collection("runs", WorkflowRun, "run_id")
         self.interrupts = _collection(
-            "interrupts", InterruptPayload, "interrupt_id", config.DDB_INTERRUPTS_TABLE
-        )
-        self.audit = _collection("audit", AuditEntry, "entry_id", config.DDB_AUDIT_TABLE)
+            "interrupts", InterruptPayload, "interrupt_id")
+        self.audit = _collection("audit", AuditEntry, "entry_id")
         self.preferences = _collection(
-            "preferences", LearnedPreference, "preference_id", config.DDB_WORKFLOWS_TABLE
-        )
+            "preferences", LearnedPreference, "preference_id")
+
+        # --- the platform layer ---
+        self.workspaces = _collection(
+            "workspaces", Workspace, "workspace_id")
+        self.credentials = _collection(
+            "credentials", Credential, "credential_id")
+        self.mcp_servers = _collection(
+            "mcp_servers", MCPServerConfig, "server_id")
+        self.skills = _collection("skills", Skill, "skill_id")
+        self.custom_agents = _collection(
+            "custom_agents", CustomAgent, "agent_id")
+        self.memory_stores = _collection(
+            "memory_stores", MemoryStore, "store_id")
+        self.memory_entries = _collection(
+            "memory_entries", MemoryEntry, "entry_id")
+        self.schedules = _collection(
+            "schedules", Schedule, "schedule_id")
+        self.artifacts = _collection(
+            "artifacts", Artifact, "artifact_id")
+        self.sessions = _collection("sessions", Session, "session_id")
+        self.usage = _collection("usage", UsageRecord, "usage_id")
+
+    # -- scoping -----------------------------------------------------------
+
+    @staticmethod
+    def _scoped(items: list, workspace_id: str | None) -> list:
+        """Filter to one workspace. ``None`` means every workspace.
+
+        Items with no workspace_id are global — the built-ins that ship with
+        Handoff — and are visible from everywhere.
+        """
+        if workspace_id is None:
+            return items
+        return [i for i in items if not i.workspace_id or i.workspace_id == workspace_id]
 
     # -- workflows ---------------------------------------------------------
 
@@ -257,6 +333,102 @@ class Store:
 
     # -- dashboard rollup --------------------------------------------------
 
+    # -- platform collections ---------------------------------------------
+
+    def list_workspaces(self) -> list[Workspace]:
+        spaces = self.workspaces.all()
+        spaces.sort(key=lambda w: (not w.is_default, w.created_at))
+        return spaces
+
+    def default_workspace(self) -> Workspace:
+        """The workspace to use when nothing else is selected, created on
+        first use so a fresh install is never in a broken half-state."""
+        for space in self.workspaces.all():
+            if space.is_default:
+                return space
+        existing = self.workspaces.all()
+        if existing:
+            return existing[0]
+        space = Workspace(
+            name="Personal",
+            description="Your default workspace.",
+            is_default=True,
+        )
+        self.workspaces.put(space, "workspace_id")
+        return space
+
+    def get_workspace(self, workspace_id: str) -> Workspace | None:
+        return self.workspaces.get("workspace_id", workspace_id)
+
+    def list_credentials(self, workspace_id: str | None = None) -> list[Credential]:
+        return self._scoped(self.credentials.all(), workspace_id)
+
+    def credential_for(self, provider: str, workspace_id: str | None = None) -> Credential | None:
+        for cred in self.list_credentials(workspace_id):
+            if cred.provider == provider and cred.secret:
+                return cred
+        return None
+
+    def list_mcp_servers(self, workspace_id: str | None = None) -> list[MCPServerConfig]:
+        return self._scoped(self.mcp_servers.all(), workspace_id)
+
+    def list_skills(self, workspace_id: str | None = None) -> list[Skill]:
+        return self._scoped(self.skills.all(), workspace_id)
+
+    def list_custom_agents(self, workspace_id: str | None = None) -> list[CustomAgent]:
+        return self._scoped(self.custom_agents.all(), workspace_id)
+
+    def list_memory_stores(self, workspace_id: str | None = None) -> list[MemoryStore]:
+        return self._scoped(self.memory_stores.all(), workspace_id)
+
+    def list_memory_entries(self, store_id: str = "") -> list[MemoryEntry]:
+        entries = self.memory_entries.all()
+        if store_id:
+            entries = [e for e in entries if e.store_id == store_id]
+        entries.sort(key=lambda e: e.created_at, reverse=True)
+        return entries
+
+    def list_schedules(self, workspace_id: str | None = None) -> list[Schedule]:
+        return self._scoped(self.schedules.all(), workspace_id)
+
+    def list_artifacts(self, workspace_id: str | None = None, run_id: str = "") -> list[Artifact]:
+        items = self._scoped(self.artifacts.all(), workspace_id)
+        if run_id:
+            items = [a for a in items if a.run_id == run_id]
+        items.sort(key=lambda a: a.created_at, reverse=True)
+        return items
+
+    def get_session(self, run_id: str) -> Session | None:
+        for session in self.sessions.all():
+            if session.run_id == run_id:
+                return session
+        return None
+
+    def list_sessions(self, workspace_id: str | None = None, limit: int = 50) -> list[Session]:
+        items = self._scoped(self.sessions.all(), workspace_id)
+        items.sort(key=lambda s: s.started_at, reverse=True)
+        return items[:limit]
+
+    def list_usage(self, workspace_id: str | None = None) -> list[UsageRecord]:
+        return self._scoped(self.usage.all(), workspace_id)
+
+    def usage_summary(self, workspace_id: str | None = None) -> dict[str, Any]:
+        records = self.list_usage(workspace_id)
+        by_model: dict[str, dict[str, int]] = {}
+        for record in records:
+            bucket = by_model.setdefault(
+                record.model or "unknown", {"input": 0, "output": 0, "calls": 0}
+            )
+            bucket["input"] += record.input_tokens
+            bucket["output"] += record.output_tokens
+            bucket["calls"] += 1
+        return {
+            "total_input": sum(r.input_tokens for r in records),
+            "total_output": sum(r.output_tokens for r in records),
+            "total_calls": len(records),
+            "by_model": by_model,
+        }
+
     def stats(self) -> dict[str, Any]:
         runs = self.runs.all()
         audit = self.audit.all()
@@ -271,6 +443,12 @@ class Store:
             "waiting_runs": sum(
                 1 for r in runs if r.status == RunStatus.WAITING_ON_HUMAN
             ),
+            "workspaces": len(self.workspaces.all()),
+            "credentials": sum(1 for c in self.credentials.all() if c.secret),
+            "skills": len(self.skills.all()),
+            "custom_agents": len(self.custom_agents.all()),
+            "artifacts": len(self.artifacts.all()),
+            "schedules": sum(1 for s in self.schedules.all() if s.enabled),
         }
 
 

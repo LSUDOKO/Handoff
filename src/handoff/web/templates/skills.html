@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Handoff — Skills{% endblock %}
+{% block body %}
+{% with title="Skills", subtitle="Judgement that differs between workspaces, written once and attached where it's needed." %}{% include "_page_head.html" %}{% endwith %}
+
+<details class="panel">
+  <summary>New skill</summary>
+  <div class="panel-body">
+    <form class="form-grid" hx-post="/skills/save" hx-target="body" hx-swap="outerHTML">
+      <div class="field"><label for="s-md">Skill document</label>
+        <span class="help">Markdown with front matter. The description is what an agent reads to decide whether the body is worth loading.</span>
+        <textarea id="s-md" name="markdown" style="min-height:16rem" required>---
+name: my-skill
+description: When this applies, and what it covers. One or two sentences.
+---
+
+The instruction itself. Be specific about what to do and what not to.
+</textarea></div>
+      <div><button type="submit">Save skill</button></div>
+    </form>
+  </div>
+</details>
+
+{% if skills %}
+<ul class="rows">
+  {% for s in skills %}
+  <li id="skill-{{ s.skill_id }}">
+    <span class="r-name">{{ s.name }}
+      {% if s.builtin %}<span class="pill builtin">built-in</span>{% endif %}
+      {% if s.enabled %}<span class="pill on">enabled</span>{% else %}<span class="pill off">disabled</span>{% endif %}
+    </span>
+    <span class="r-desc">{{ s.description }}</span>
+    <span class="r-meta">{{ s.namespace }}:{{ s.name }} · {{ s.body|length }} characters</span>
+    <span class="r-actions">
+      <a class="button" href="/skills/{{ s.skill_id }}">Open</a>
+      <button hx-post="/skills/{{ s.skill_id }}/toggle" hx-target="body" hx-swap="outerHTML">{{ 'Disable' if s.enabled else 'Enable' }}</button>
+      {% if not s.builtin %}
+      <button class="danger" hx-post="/skills/{{ s.skill_id }}/delete" hx-target="body" hx-swap="outerHTML" hx-confirm="Delete {{ s.name }}?">Delete</button>
+      {% endif %}
+    </span>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty-state">No skills yet.</p>
+{% endif %}
+{% endblock %}

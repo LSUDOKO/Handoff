@@ -114,44 +114,54 @@ def list_preferences(preference_key: str | None = None) -> list[LearnedPreferenc
     return get_store().list_preferences(preference_key)
 
 
+#: How a rule matched, strongest first. Used to rank candidates and to check
+#: whether a freshly written rule can fire at all.
+MATCH_SENDER = 3
+MATCH_DOMAIN = 2
+MATCH_KEYWORDS = 1
+MATCH_NONE = 0
+
+
+def preference_strength(
+    pref: LearnedPreference, sender: str = "", subject: str = "", snippet: str = ""
+) -> int:
+    """How strongly one rule matches one item.
+
+    Returns ``MATCH_NONE`` when the rule does not cover the item at all. A
+    keyword rule needs at least two distinct hits to count — one shared word
+    is a coincidence, not a rule, and a rule that fires on a coincidence takes
+    an action nobody sanctioned.
+    """
+    sender = (sender or "").lower().strip()
+    haystack = f"{subject} {snippet}".lower()
+    match_sender = (pref.match_sender or "").lower().strip()
+
+    if match_sender and match_sender == sender:
+        return MATCH_SENDER
+
+    if match_sender.startswith("@") and sender.endswith(match_sender):
+        return MATCH_DOMAIN
+
+    hits = sum(1 for kw in pref.match_keywords if kw.lower() in haystack)
+    return MATCH_KEYWORDS if hits >= 2 else MATCH_NONE
+
+
 def find_matching_preference(
     sender: str = "", subject: str = "", snippet: str = "", preference_key: str | None = None
 ) -> LearnedPreference | None:
     """Find a rule the user already gave us that covers this item.
 
-    An exact sender match wins outright. Otherwise a preference must match on
-    at least two distinct keywords before it is allowed to fire — one shared
-    word is a coincidence, not a rule.
+    An exact sender match wins outright, then a whole domain, then keywords.
+    Within a tier the most confident rule wins.
     """
-    prefs = list_preferences(preference_key)
-    if not prefs:
+    scored = [
+        (preference_strength(pref, sender, subject, snippet), pref.confidence, pref)
+        for pref in list_preferences(preference_key)
+    ]
+    usable = [entry for entry in scored if entry[0] > MATCH_NONE]
+    if not usable:
         return None
-
-    sender = (sender or "").lower().strip()
-    haystack = f"{subject} {snippet}".lower()
-
-    exact = [p for p in prefs if p.match_sender and p.match_sender.lower() == sender]
-    if exact:
-        return max(exact, key=lambda p: p.confidence)
-
-    domain = sender.split("@")[-1] if "@" in sender else ""
-    if domain:
-        by_domain = [
-            p for p in prefs
-            if p.match_sender.startswith("@") and p.match_sender.lower().lstrip("@") == domain
-        ]
-        if by_domain:
-            return max(by_domain, key=lambda p: p.confidence)
-
-    best: LearnedPreference | None = None
-    best_hits = 0
-    for pref in prefs:
-        if not pref.match_keywords:
-            continue
-        hits = sum(1 for kw in pref.match_keywords if kw.lower() in haystack)
-        if hits >= 2 and hits > best_hits:
-            best, best_hits = pref, hits
-    return best
+    return max(usable, key=lambda entry: (entry[0], entry[1]))[2]
 
 
 # --- Tools exposed to the agents -------------------------------------------

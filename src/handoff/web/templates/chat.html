@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Handoff — Build a workflow{% endblock %}
 {% block body %}
+{% with title="Build a workflow", subtitle="Describe a chore the way you'd describe it to a colleague." %}{% include "_page_head.html" %}{% endwith %}
 <main class="chat">
   {% if templates_list %}
   <section class="templates" id="templates">

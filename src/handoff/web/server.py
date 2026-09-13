@@ -11,6 +11,7 @@ The decision screen is the one that matters. Everything else is reporting.
 from __future__ import annotations
 
 import json
+import os
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
@@ -29,11 +30,24 @@ from fastapi.responses import (  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from fastapi.templating import Jinja2Templates  # noqa: E402
 
-from handoff import config, events  # noqa: E402
+from handoff import (  # noqa: E402
+    config,
+    daemon,  # noqa: E402
+    events,
+)
 from handoff.agents.builder import BuilderSession  # noqa: E402
 from handoff.agents.executor import run_workflow, submit_decision  # noqa: E402
 from handoff.memory.store import list_preferences  # noqa: E402
 from handoff.models import InterruptPayload, WorkflowRun  # noqa: E402
+from handoff.platform import (  # noqa: E402
+    agents_registry,  # noqa: E402
+    marketplace,
+)
+from handoff.platform import credentials as creds  # noqa: E402
+from handoff.platform import skills as skills_mod  # noqa: E402
+from handoff.platform import usage as usage_mod  # noqa: E402
+from handoff.platform.bootstrap import bootstrap  # noqa: E402
+from handoff.platform.models import CustomAgent, MCPServerConfig, Workspace  # noqa: E402
 from handoff.store import get_store  # noqa: E402
 from handoff.tools.mcp_discovery import validate_config_dict  # noqa: E402
 from handoff.tools.scheduler import describe_schedule  # noqa: E402
@@ -44,7 +58,7 @@ from handoff.tools.voice import (  # noqa: E402
     stt_available,
     transcribe,
 )
-from handoff.tools.workflow_store import load_example_workflows, seed_examples  # noqa: E402
+from handoff.tools.workflow_store import load_example_workflows  # noqa: E402
 
 config.configure_observability()
 
@@ -192,10 +206,18 @@ def _audit_view(entry) -> dict[str, Any]:
 
 
 def _context(request: Request, page: str, **extra: Any) -> dict[str, Any]:
+    """Everything the shell needs, plus whatever the page adds."""
+    store = get_store()
+    workspace = _workspace()
     return {
         "request": request,
         "page": page,
         "settings": config.settings_summary(),
+        "workspace": workspace,
+        "workspaces": store.list_workspaces(),
+        "stats": store.stats(),
+        "scheduler": daemon.get_scheduler().status(),
+        "voice_enabled": stt_available(),
         **extra,
     }
 
@@ -266,12 +288,38 @@ templates.env.filters["action_phrase"] = action_phrase
 # --- routes ----------------------------------------------------------------
 
 
+#: Which workspace this browser session is looking at.
+_ACTIVE_WORKSPACE: dict[str, str] = {}
+
+
+def _workspace() -> Workspace:
+    store = get_store()
+    chosen = _ACTIVE_WORKSPACE.get("id")
+    if chosen:
+        found = store.get_workspace(chosen)
+        if found is not None:
+            return found
+    return store.default_workspace()
+
+
 @app.on_event("startup")
-def _bootstrap() -> None:
-    """Seed the example workflows so a fresh clone has something to run."""
-    seeded = seed_examples()
-    if seeded:
-        print(f"[handoff] seeded {len(seeded)} example workflow(s)")
+def _startup() -> None:
+    """Bring the install up, then start the scheduler.
+
+    Bootstrap is idempotent, so this runs every start and does nothing the
+    second time.
+    """
+    report = bootstrap()
+    new = {k: v for k, v in report.items() if isinstance(v, list) and v}
+    if new:
+        print(f"[handoff] first-run setup: { {k: len(v) for k, v in new.items()} }")
+    daemon.get_scheduler().start()
+    print("[handoff] scheduler running")
+
+
+@app.on_event("shutdown")
+def _shutdown() -> None:
+    daemon.get_scheduler().stop()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -283,8 +331,7 @@ def dashboard(request: Request):
         name="dashboard.html",
         context=_context(
             request,
-            "dashboard",
-            stats=store.stats(),
+            "activity",
             pending=store.pending_interrupts(),
             workflows=[_flow_view(w, store) for w in store.list_workflows()],
             audit=[_audit_view(e) for e in store.list_audit(limit=40)],
@@ -621,3 +668,651 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(app, host="127.0.0.1", port=config.UI_PORT)
+
+
+# ============================================================================
+# The platform
+# ============================================================================
+
+
+def slug(text: str) -> str:
+    import re
+
+    return re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-") or "workspace"
+
+
+def _humanise_delta(when: datetime | None) -> str:
+    return _ago(when) if when else "never"
+
+
+# --- workspaces -------------------------------------------------------------
+
+
+@app.post("/workspace/switch")
+def workspace_switch(workspace_id: str = Form(...)):
+    """Point this browser at a different workspace."""
+    if get_store().get_workspace(workspace_id) is not None:
+        _ACTIVE_WORKSPACE["id"] = workspace_id
+        creds.apply_credentials(workspace_id)
+    return Response(status_code=204)
+
+
+@app.post("/workspace/create", response_class=HTMLResponse)
+def workspace_create(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    icon: str = Form("◆"),
+):
+    from handoff.platform.bootstrap import seed_memory_stores
+
+    store = get_store()
+    workspace = Workspace(name=name.strip(), description=description, icon=icon or "◆")
+    store.workspaces.put(workspace, "workspace_id")
+    seed_memory_stores(workspace.workspace_id)
+    _ACTIVE_WORKSPACE["id"] = workspace.workspace_id
+    return _settings_page(request, flash=f"Created {workspace.name}.", kind="ok")
+
+
+@app.get("/workspace/export")
+def workspace_export():
+    """A workspace as portable JSON — without its credentials."""
+    payload = marketplace.export_workspace(_workspace().workspace_id)
+    name = slug(_workspace().name)
+    return Response(
+        content=json.dumps(payload, indent=2, default=str),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{name}-workspace.json"'},
+    )
+
+
+# --- workflows --------------------------------------------------------------
+
+
+@app.get("/platform", response_class=HTMLResponse)
+def platform_page(request: Request):
+    store = get_store()
+    return templates.TemplateResponse(
+        request=request,
+        name="platform.html",
+        context=_context(
+            request,
+            "platform",
+            workflows=[_flow_view(w, store) for w in store.list_workflows()],
+        ),
+    )
+
+
+# --- schedules --------------------------------------------------------------
+
+
+def _schedule_view(schedule, store) -> dict[str, Any]:
+    workflow = store.get_workflow(schedule.workflow_id)
+    described = describe_schedule(schedule.cron, schedule.timezone)
+    return {
+        "schedule_id": schedule.schedule_id,
+        "workflow_id": schedule.workflow_id,
+        "workflow_name": workflow.name if workflow else schedule.workflow_id,
+        "cron": schedule.cron,
+        "timezone": schedule.timezone,
+        "enabled": schedule.enabled,
+        "run_count": schedule.run_count,
+        "readable": described.get("readable", schedule.cron),
+        "next_in": daemon.describe_next(schedule) if schedule.enabled else "paused",
+        "last_run": _humanise_delta(schedule.last_run_at),
+    }
+
+
+@app.get("/schedules", response_class=HTMLResponse)
+def schedules_page(request: Request):
+    store = get_store()
+    daemon.sync_schedules()
+    return templates.TemplateResponse(
+        request=request,
+        name="schedules.html",
+        context=_context(
+            request,
+            "schedules",
+            schedules=[_schedule_view(s, store) for s in store.list_schedules(None)],
+        ),
+    )
+
+
+@app.post("/schedules/{schedule_id}/toggle", response_class=HTMLResponse)
+def schedule_toggle(request: Request, schedule_id: str):
+    store = get_store()
+    schedule = store.schedules.get("schedule_id", schedule_id)
+    if schedule is None:
+        raise HTTPException(404, "No such schedule")
+    schedule.enabled = not schedule.enabled
+    schedule.next_run_at = (
+        daemon.next_fire(schedule.cron, schedule.timezone) if schedule.enabled else None
+    )
+    store.schedules.put(schedule, "schedule_id")
+    return templates.TemplateResponse(
+        request=request, name="_schedule_row.html", context={"s": _schedule_view(schedule, store)}
+    )
+
+
+@app.post("/schedules/{schedule_id}/run", response_class=HTMLResponse)
+def schedule_run_now(request: Request, schedule_id: str):
+    store = get_store()
+    schedule = store.schedules.get("schedule_id", schedule_id)
+    if schedule is None:
+        raise HTTPException(404, "No such schedule")
+    try:
+        _run_in_background(schedule.workflow_id)
+    except KeyError:
+        raise HTTPException(404, "That workflow no longer exists") from None
+    return templates.TemplateResponse(
+        request=request, name="_schedule_row.html", context={"s": _schedule_view(schedule, store)}
+    )
+
+
+# --- credentials ------------------------------------------------------------
+
+
+def _credentials_page(request: Request, flash: str = "", kind: str = "ok"):
+    return templates.TemplateResponse(
+        request=request,
+        name="credentials.html",
+        context=_context(
+            request,
+            "credentials",
+            credentials=creds.catalogue(None),
+            flash=flash,
+            flash_kind=kind,
+        ),
+    )
+
+
+def _credentials_fragment(request: Request, flash: str = "", kind: str = "ok"):
+    return templates.TemplateResponse(
+        request=request,
+        name="_credentials_list.html",
+        context={
+            "credentials": creds.catalogue(None),
+            "flash": flash,
+            "flash_kind": kind,
+        },
+    )
+
+
+@app.get("/credentials", response_class=HTMLResponse)
+def credentials_page(request: Request):
+    return _credentials_page(request)
+
+
+@app.post("/credentials/connect", response_class=HTMLResponse)
+def credentials_connect(
+    request: Request, provider: str = Form(...), secret: str = Form("")
+):
+    if not secret.strip():
+        return _credentials_fragment(request, "Paste a key first.", "bad")
+    try:
+        cred = creds.connect(provider, secret, _workspace().workspace_id)
+    except KeyError:
+        return _credentials_fragment(request, f"Unknown provider '{provider}'.", "bad")
+
+    if cred.status.value == "connected":
+        return _credentials_fragment(request, f"{cred.label} connected.", "ok")
+    return _credentials_fragment(
+        request, f"Saved, but the check failed: {cred.last_error}", "bad"
+    )
+
+
+@app.post("/credentials/{credential_id}/check", response_class=HTMLResponse)
+def credentials_check(request: Request, credential_id: str):
+    try:
+        cred = creds.verify(credential_id)
+    except KeyError:
+        return _credentials_fragment(request, "That credential is gone.", "bad")
+    ok = cred.status.value == "connected"
+    return _credentials_fragment(
+        request,
+        f"{cred.label}: {'working' if ok else cred.last_error or 'not connected'}",
+        "ok" if ok else "bad",
+    )
+
+
+@app.post("/credentials/{credential_id}/disconnect", response_class=HTMLResponse)
+def credentials_disconnect(request: Request, credential_id: str):
+    creds.disconnect(credential_id)
+    return _credentials_fragment(request, "Forgotten.", "ok")
+
+
+# --- tool servers -----------------------------------------------------------
+
+
+def _server_view(server) -> dict[str, Any]:
+    ready = all(os.getenv(var) for var in server.required_env) if server.required_env else True
+    return {**server.model_dump(mode="json"), "ready": ready}
+
+
+@app.get("/mcp", response_class=HTMLResponse)
+def mcp_page(request: Request):
+    store = get_store()
+    return templates.TemplateResponse(
+        request=request,
+        name="mcp.html",
+        context=_context(
+            request, "mcp", servers=[_server_view(s) for s in store.list_mcp_servers(None)]
+        ),
+    )
+
+
+@app.post("/mcp/save", response_class=HTMLResponse)
+def mcp_save(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    transport: str = Form("stdio"),
+    command: str = Form(""),
+    args: str = Form(""),
+    url: str = Form(""),
+    required_env: str = Form(""),
+):
+    store = get_store()
+    server = MCPServerConfig(
+        workspace_id=_workspace().workspace_id,
+        name=name.strip(),
+        description=description,
+        transport=transport,
+        command=command.strip(),
+        args=args.split(),
+        url=url.strip(),
+        required_env=required_env.split(),
+    )
+    store.mcp_servers.put(server, "server_id")
+    return mcp_page(request)
+
+
+@app.post("/mcp/{server_id}/toggle", response_class=HTMLResponse)
+def mcp_toggle(request: Request, server_id: str):
+    store = get_store()
+    server = store.mcp_servers.get("server_id", server_id)
+    if server is not None:
+        server.enabled = not server.enabled
+        store.mcp_servers.put(server, "server_id")
+    return mcp_page(request)
+
+
+@app.post("/mcp/{server_id}/probe", response_class=HTMLResponse)
+def mcp_probe(request: Request, server_id: str):
+    """Actually connect and list the tools, so 'ready' is a fact not a guess."""
+    store = get_store()
+    server = store.mcp_servers.get("server_id", server_id)
+    if server is None:
+        raise HTTPException(404, "No such server")
+
+    from handoff.mcp.servers import get_client
+
+    try:
+        client = get_client(server.name)
+        server.tool_names = [t.tool_name for t in client.list_tools_sync()]
+        server.last_error = ""
+    except Exception as exc:
+        server.last_error = str(exc)[:200]
+    store.mcp_servers.put(server, "server_id")
+    return mcp_page(request)
+
+
+@app.post("/mcp/{server_id}/delete", response_class=HTMLResponse)
+def mcp_delete(request: Request, server_id: str):
+    get_store().mcp_servers.delete("server_id", server_id)
+    return mcp_page(request)
+
+
+# --- skills -----------------------------------------------------------------
+
+
+@app.get("/skills", response_class=HTMLResponse)
+def skills_page(request: Request):
+    store = get_store()
+    return templates.TemplateResponse(
+        request=request,
+        name="skills.html",
+        context=_context(request, "skills", skills=store.list_skills(None)),
+    )
+
+
+@app.get("/skills/{skill_id}", response_class=HTMLResponse)
+def skill_detail(request: Request, skill_id: str):
+    store = get_store()
+    skill = store.skills.get("skill_id", skill_id)
+    if skill is None:
+        raise HTTPException(404, "No such skill")
+    return templates.TemplateResponse(
+        request=request,
+        name="skill_detail.html",
+        context=_context(request, "skills", skill=skill, markdown=skills_mod.render(skill)),
+    )
+
+
+@app.post("/skills/save", response_class=HTMLResponse)
+def skills_save(request: Request, markdown: str = Form(...), skill_id: str = Form("")):
+    skills_mod.save_from_markdown(
+        markdown, workspace_id=_workspace().workspace_id, skill_id=skill_id
+    )
+    return skills_page(request)
+
+
+@app.post("/skills/{skill_id}/toggle", response_class=HTMLResponse)
+def skills_toggle(request: Request, skill_id: str):
+    store = get_store()
+    skill = store.skills.get("skill_id", skill_id)
+    if skill is not None:
+        skill.enabled = not skill.enabled
+        store.skills.put(skill, "skill_id")
+    return skills_page(request)
+
+
+@app.post("/skills/{skill_id}/delete", response_class=HTMLResponse)
+def skills_delete(request: Request, skill_id: str):
+    get_store().skills.delete("skill_id", skill_id)
+    return skills_page(request)
+
+
+# --- agents -----------------------------------------------------------------
+
+
+@app.get("/agents", response_class=HTMLResponse)
+def agents_page(request: Request):
+    store = get_store()
+    return templates.TemplateResponse(
+        request=request,
+        name="agents.html",
+        context=_context(
+            request,
+            "agents",
+            agents=store.list_custom_agents(None),
+            skills=[s for s in store.list_skills(None) if s.enabled],
+            available_tools=agents_registry.AVAILABLE_TOOLS,
+        ),
+    )
+
+
+@app.get("/agents/{agent_id}", response_class=HTMLResponse)
+def agent_detail(request: Request, agent_id: str):
+    store = get_store()
+    agent = store.custom_agents.get("agent_id", agent_id)
+    if agent is None:
+        raise HTTPException(404, "No such agent")
+
+    resolved = agent.system_prompt
+    block = skills_mod.compose(agent.skills, None)
+    if block:
+        resolved = f"{resolved}\n\n{block}".strip()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="agent_detail.html",
+        context=_context(
+            request,
+            "agents",
+            agent=agent,
+            skills=[s for s in store.list_skills(None) if s.enabled],
+            available_tools=agents_registry.AVAILABLE_TOOLS,
+            resolved_prompt=resolved or "(empty)",
+        ),
+    )
+
+
+@app.post("/agents/save", response_class=HTMLResponse)
+async def agents_save(request: Request):
+    form = await request.form()
+    store = get_store()
+    agent_id = str(form.get("agent_id", ""))
+
+    agent = store.custom_agents.get("agent_id", agent_id) if agent_id else None
+    if agent is None:
+        agent = CustomAgent(workspace_id=_workspace().workspace_id, name="")
+
+    agent.name = str(form.get("name", "")).strip() or agent.name or "Untitled agent"
+    agent.description = str(form.get("description", ""))
+    agent.system_prompt = str(form.get("system_prompt", ""))
+    agent.model_override = str(form.get("model_override", "")).strip()
+    agent.tools = [str(v) for v in form.getlist("tools")]
+    agent.skills = [str(v) for v in form.getlist("skills")]
+    agents_registry.save(agent)
+    return agents_page(request)
+
+
+@app.post("/agents/{agent_id}/delete", response_class=HTMLResponse)
+def agents_delete(request: Request, agent_id: str):
+    get_store().custom_agents.delete("agent_id", agent_id)
+    return agents_page(request)
+
+
+# --- sessions ---------------------------------------------------------------
+
+
+@app.get("/inspector", response_class=HTMLResponse)
+def inspector_page(request: Request):
+    store = get_store()
+    rows = []
+    for run in store.list_runs(limit=40):
+        workflow = store.get_workflow(run.workflow_id)
+        session = store.get_session(run.run_id)
+        duration = ""
+        if run.finished_at:
+            seconds = int((run.finished_at - run.started_at).total_seconds())
+            duration = f"{seconds // 60}m {seconds % 60:02d}s" if seconds >= 60 else f"{seconds}s"
+        rows.append(
+            {
+                "run_id": run.run_id,
+                "workflow_name": workflow.name if workflow else run.workflow_id,
+                "status": run.status.value,
+                "summary": run.summary,
+                "started": _ago(run.started_at),
+                "duration": duration,
+                "model_calls": session.model_calls if session else 0,
+                "tool_calls": session.tool_calls if session else 0,
+            }
+        )
+    return templates.TemplateResponse(
+        request=request, name="inspector.html", context=_context(request, "inspector", sessions=rows)
+    )
+
+
+@app.get("/inspector/{run_id}", response_class=HTMLResponse)
+def inspector_detail(request: Request, run_id: str):
+    store = get_store()
+    run = store.get_run(run_id)
+    if run is None:
+        raise HTTPException(404, "No such run")
+
+    session = store.get_session(run_id)
+    steps = [
+        {
+            **step.model_dump(mode="json"),
+            "input_pretty": json.dumps(step.input, indent=2, default=str) if step.input else "",
+        }
+        for step in (session.steps if session else [])
+    ]
+
+    return templates.TemplateResponse(
+        request=request,
+        name="inspector_detail.html",
+        context=_context(
+            request,
+            "inspector",
+            run=_run_view(run),
+            session=session,
+            steps=steps,
+        ),
+    )
+
+
+# --- artifacts --------------------------------------------------------------
+
+
+@app.get("/artifacts", response_class=HTMLResponse)
+def artifacts_page(request: Request):
+    store = get_store()
+    rows = []
+    for artifact in store.list_artifacts(None):
+        rows.append(
+            {
+                **artifact.model_dump(mode="json"),
+                "preview": artifact.content[:180] + ("…" if len(artifact.content) > 180 else ""),
+                "created": _ago(artifact.created_at),
+                "size": artifact.size,
+            }
+        )
+    return templates.TemplateResponse(
+        request=request, name="artifacts.html", context=_context(request, "artifacts", artifacts=rows)
+    )
+
+
+@app.get("/artifacts/{artifact_id}", response_class=HTMLResponse)
+def artifact_detail(request: Request, artifact_id: str):
+    artifact = get_store().artifacts.get("artifact_id", artifact_id)
+    if artifact is None:
+        raise HTTPException(404, "No such artifact")
+    return templates.TemplateResponse(
+        request=request,
+        name="artifact_detail.html",
+        context=_context(
+            request, "artifacts", artifact=artifact, created=_ago(artifact.created_at)
+        ),
+    )
+
+
+@app.get("/artifacts/{artifact_id}/raw")
+def artifact_raw(artifact_id: str):
+    artifact = get_store().artifacts.get("artifact_id", artifact_id)
+    if artifact is None:
+        raise HTTPException(404, "No such artifact")
+    media = {
+        "json": "application/json",
+        "csv": "text/csv",
+        "html": "text/html",
+        "markdown": "text/markdown",
+    }.get(artifact.kind, "text/plain")
+    return Response(content=artifact.content, media_type=f"{media}; charset=utf-8")
+
+
+# --- memory -----------------------------------------------------------------
+
+
+@app.get("/memory", response_class=HTMLResponse)
+def memory_page(request: Request):
+    store = get_store()
+    return templates.TemplateResponse(
+        request=request,
+        name="memory.html",
+        context=_context(
+            request,
+            "memory",
+            rules=list_preferences(),
+            stores=store.list_memory_stores(None),
+            backend="AgentCore" if config.USE_AGENTCORE_MEMORY else "local",
+        ),
+    )
+
+
+@app.post("/memory/rules/{preference_id}/delete", response_class=HTMLResponse)
+def memory_forget(request: Request, preference_id: str):
+    get_store().preferences.delete("preference_id", preference_id)
+    return memory_page(request)
+
+
+# --- usage ------------------------------------------------------------------
+
+
+@app.get("/usage", response_class=HTMLResponse)
+def usage_page(request: Request):
+    summary = usage_mod.summary(None)
+    biggest = max((m["total"] for m in summary["models"]), default=0) or 1
+    for model in summary["models"]:
+        model["share"] = round(model["total"] / biggest * 100)
+    return templates.TemplateResponse(
+        request=request, name="usage.html", context=_context(request, "usage", usage=summary)
+    )
+
+
+# --- discover ---------------------------------------------------------------
+
+
+@app.get("/discover", response_class=HTMLResponse)
+def discover_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="discover.html",
+        context=_context(request, "discover", templates=marketplace.catalogue()),
+    )
+
+
+@app.post("/discover/{slug}/install", response_class=HTMLResponse)
+def discover_install(request: Request, slug: str):
+    try:
+        marketplace.install(slug, _workspace().workspace_id)
+    except KeyError:
+        raise HTTPException(404, "No such template") from None
+    daemon.sync_schedules()
+    return discover_page(request)
+
+
+# --- settings ---------------------------------------------------------------
+
+
+def _settings_page(request: Request, flash: str = "", kind: str = "ok"):
+    return templates.TemplateResponse(
+        request=request,
+        name="settings.html",
+        context=_context(request, "settings", flash=flash, flash_kind=kind),
+    )
+
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request):
+    return _settings_page(request)
+
+
+@app.post("/settings/save", response_class=HTMLResponse)
+def settings_save(request: Request, confidence_threshold: float = Form(...)):
+    """Change the gate's threshold for this process.
+
+    Deliberately not written back to .env — a value you set in a file should
+    not be silently rewritten by a slider. The page says as much.
+    """
+    config.CONFIDENCE_THRESHOLD = max(0.0, min(1.0, confidence_threshold))
+    return _settings_page(
+        request,
+        f"Threshold set to {config.CONFIDENCE_THRESHOLD:.0%} for this session. "
+        f"Set CONFIDENCE_THRESHOLD in .env to make it permanent.",
+        "ok",
+    )
+
+
+# --- platform API -----------------------------------------------------------
+
+
+@app.get("/api/scheduler")
+def api_scheduler():
+    return JSONResponse(daemon.get_scheduler().status())
+
+
+@app.get("/api/workspaces")
+def api_workspaces():
+    return JSONResponse([w.model_dump(mode="json") for w in get_store().list_workspaces()])
+
+
+@app.get("/api/credentials")
+def api_credentials():
+    """Connection states only — secrets never leave the process."""
+    return JSONResponse(creds.catalogue(None))
+
+
+@app.get("/api/usage")
+def api_usage():
+    return JSONResponse(usage_mod.summary(None))
+
+
+@app.get("/api/sessions/{run_id}")
+def api_session(run_id: str):
+    session = get_store().get_session(run_id)
+    if session is None:
+        raise HTTPException(404, "No trace for that run")
+    return JSONResponse(session.model_dump(mode="json"))

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Handoff — Schedules{% endblock %}
+{% block body %}
+{% with title="Schedules", subtitle="The triggers that fire without you. The scheduler runs inside this app, so these fire while it's open." %}{% include "_page_head.html" %}{% endwith %}
+
+<section class="stat-strip">
+  <div><span class="v {{ 'done' if scheduler.running else '' }}">{{ 'on' if scheduler.running else 'off' }}</span><span class="k">scheduler</span></div>
+  <div><span class="v">{{ scheduler.enabled_schedules }}</span><span class="k">enabled</span></div>
+  <div><span class="v">{{ scheduler.fired }}</span><span class="k">fired this session</span></div>
+  <div><span class="v">{{ scheduler.ticks }}</span><span class="k">checks</span></div>
+</section>
+
+{% if schedules %}
+<ul class="rows">
+  {% for s in schedules %}
+  <li id="sched-{{ s.schedule_id }}">
+    <span class="r-name">
+      {{ s.workflow_name }}
+      {% if s.enabled %}<span class="pill on">enabled</span>{% else %}<span class="pill off">paused</span>{% endif %}
+    </span>
+    <span class="r-desc">{{ s.readable }}</span>
+    <span class="r-meta">{{ s.cron }} · {{ s.timezone }} · next {{ s.next_in }}{% if s.run_count %} · fired {{ s.run_count }}×{% endif %}</span>
+    <span class="r-actions">
+      <button hx-post="/schedules/{{ s.schedule_id }}/toggle" hx-target="#sched-{{ s.schedule_id }}" hx-swap="outerHTML">
+        {{ 'Pause' if s.enabled else 'Enable' }}
+      </button>
+      <button hx-post="/schedules/{{ s.schedule_id }}/run" hx-target="#sched-{{ s.schedule_id }}" hx-swap="outerHTML">Run now</button>
+    </span>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty-state">No schedules. A workflow with a cron trigger gets one automatically.</p>
+{% endif %}
+
+<details class="panel" style="margin-top:2rem">
+  <summary>Why does this only fire while the app is open?</summary>
+  <div class="panel-body">
+    <p class="page-sub" style="max-width:var(--measure)">The scheduler is a loop inside this process — no second service to install, no message bus. That's the right trade for a laptop, but it means a workflow only fires while Handoff is running.</p>
+    <p class="page-sub" style="max-width:var(--measure)">For schedules that must fire whether or not your machine is awake, deploy to AgentCore Runtime and let EventBridge own the cron: <code class="mono">python infra/eventbridge_setup.py --list</code>.</p>
+  </div>
+</details>
+{% endblock %}

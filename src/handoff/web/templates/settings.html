@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Handoff — Settings{% endblock %}
+{% block body %}
+{% with title="Settings", subtitle="How this installation behaves." %}{% include "_page_head.html" %}{% endwith %}
+
+{% if flash %}<div class="flash {{ flash_kind }}">{{ flash }}</div>{% endif %}
+
+<section class="block">
+  <h2>The gate</h2>
+  <form class="form-grid" hx-post="/settings/save" hx-target="body" hx-swap="outerHTML">
+    <div class="field">
+      <label for="thr">Confidence threshold — {{ (settings.confidence_threshold*100)|round|int }}%</label>
+      <span class="help">Below this, it stops and asks instead of acting. Raise it to be asked more often while you're still deciding whether to trust it; lower it once the learned rules have built up.</span>
+      <input id="thr" name="confidence_threshold" type="range" min="0.3" max="0.95" step="0.05"
+             value="{{ settings.confidence_threshold }}"
+             oninput="this.previousElementSibling.previousElementSibling.textContent='Confidence threshold — '+Math.round(this.value*100)+'%'">
+    </div>
+    <div><button type="submit">Save</button></div>
+  </form>
+</section>
+
+<section class="block">
+  <h2>Runtime</h2>
+  <table class="grid-table">
+    <tbody>
+      <tr><td>Model provider</td><td class="mono">{{ settings.provider }}</td></tr>
+      <tr><td>Model</td><td class="mono">{{ settings.model_id }}</td></tr>
+      <tr><td>Tools</td><td class="mono">{{ 'synthetic inbox' if settings.use_mock_tools else 'live integrations' }}</td></tr>
+      <tr><td>Storage</td><td class="mono">{{ 'DynamoDB' if settings.use_dynamodb else 'local JSON' }} · {{ settings.state_dir }}</td></tr>
+      <tr><td>Memory</td><td class="mono">{{ 'AgentCore Memory' if settings.use_agentcore_memory else 'local' }}</td></tr>
+      <tr><td>Notifications</td><td class="mono">{{ settings.notify_channel }}</td></tr>
+      <tr><td>Tracing</td><td class="mono">{{ 'OTEL → ' + settings.otel_exporter if settings.otel_enabled else 'off' }}</td></tr>
+      <tr><td>Scheduler</td><td class="mono">{{ 'running, checks every ' ~ scheduler.tick_seconds ~ 's' if scheduler.running else 'idle' }}</td></tr>
+      <tr><td>Voice</td><td class="mono">{{ 'Whisper + Orpheus' if voice_enabled else 'browser speech only' }}</td></tr>
+    </tbody>
+  </table>
+  <p class="page-sub" style="margin-top:1rem">These come from <code class="mono">.env</code>. Change them there and restart, or connect a provider on the <a href="/credentials">Credentials</a> page.</p>
+</section>
+
+<section class="block">
+  <h2>Workspace</h2>
+  <form class="form-grid" hx-post="/workspace/create" hx-target="body" hx-swap="outerHTML">
+    <div class="field-row">
+      <div class="field"><label for="w-name">New workspace</label><input id="w-name" name="name" required placeholder="Team on-call"></div>
+      <div class="field"><label for="w-icon">Icon</label><input id="w-icon" name="icon" value="◆" maxlength="2"></div>
+    </div>
+    <div class="field"><label for="w-desc">Description</label><input id="w-desc" name="description" placeholder="What this workspace is for."></div>
+    <div><button type="submit">Create workspace</button></div>
+  </form>
+  <p class="page-sub" style="margin-top:1rem">Separate workspaces keep learned rules and credentials apart — a rule you set for your own mail should not start acting on a shared account.</p>
+  <p style="margin-top:.75rem"><a class="button" href="/workspace/export">Export this workspace</a></p>
+</section>
+{% endblock %}

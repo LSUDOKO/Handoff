@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Handoff — {{ agent.name }}{% endblock %}
+{% block body %}
+{% with title=agent.name, subtitle=agent.description, actions='<a class="button" href="/agents">All agents</a>' %}{% include "_page_head.html" %}{% endwith %}
+
+<form class="form-grid" hx-post="/agents/save" hx-target="body" hx-swap="outerHTML">
+  <input type="hidden" name="agent_id" value="{{ agent.agent_id }}">
+  <div class="field-row">
+    <div class="field"><label for="e-name">Name</label>
+      <input id="e-name" name="name" value="{{ agent.name }}" required {% if agent.builtin %}readonly{% endif %}></div>
+    <div class="field"><label for="e-model">Model override</label>
+      <input id="e-model" name="model_override" value="{{ agent.model_override }}" placeholder="(workspace default)"></div>
+  </div>
+  <div class="field"><label for="e-desc">Description</label>
+    <input id="e-desc" name="description" value="{{ agent.description }}"></div>
+  <div class="field"><label for="e-prompt">System prompt</label>
+    <textarea id="e-prompt" name="system_prompt" style="min-height:14rem">{{ agent.system_prompt }}</textarea></div>
+  <div class="field"><label>Tools</label>
+    <div class="checks">
+      {% for name, purpose in available_tools.items() %}
+      <label><input type="checkbox" name="tools" value="{{ name }}" {% if name in agent.tools %}checked{% endif %}>
+        <span><code class="mono">{{ name }}</code><br><span class="t">{{ purpose }}</span></span></label>
+      {% endfor %}
+    </div></div>
+  {% if skills %}
+  <div class="field"><label>Skills</label>
+    <div class="checks">
+      {% for s in skills %}
+      <label><input type="checkbox" name="skills" value="{{ s.skill_id }}" {% if s.skill_id in agent.skills %}checked{% endif %}>
+        <span>{{ s.name }}<br><span class="t">{{ s.description[:70] }}</span></span></label>
+      {% endfor %}
+    </div></div>
+  {% endif %}
+  <div class="page-actions"><button type="submit">Save changes</button></div>
+</form>
+
+<details class="panel" style="margin-top:2rem">
+  <summary>Resolved system prompt</summary>
+  <div class="panel-body">
+    <p class="page-sub">What this agent actually receives, once its skills are folded in.</p>
+    <pre class="mono" style="white-space:pre-wrap;background:var(--paper-raised);border:1px solid var(--rule);border-radius:3px;padding:1rem;max-height:24rem;overflow:auto">{{ resolved_prompt }}</pre>
+  </div>
+</details>
+{% endblock %}

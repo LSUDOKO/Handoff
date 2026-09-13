@@ -97,11 +97,15 @@ def learn_from_decision(
     the fact — a model that forgets the argument, or a fallback rule written
     without a model at all, still ends up where the executor looks.
     """
-    from handoff.memory.store import save_preference
+    from handoff.memory.store import (
+        preference_strength,
+        save_preference,
+    )
     from handoff.models import LearnedPreference
 
     preference_key = preference_key or "default_rules"
     before_ids = {p.preference_id for p in list_preferences()}
+    repaired: list[str] = []
 
     reply = ""
     try:
@@ -117,6 +121,24 @@ def learn_from_decision(
         if rule.preference_key != preference_key:
             rule.preference_key = preference_key
             save_preference(rule)
+
+    # A rule that cannot fire on the item it was learned from is dead on
+    # arrival, and it fails silently: the next run asks the same question and
+    # nothing says why. Models reliably name the sender in the rule's prose
+    # while leaving ``match_sender`` empty, or draw keywords from their own
+    # sentence ("archive cold outreach emails") rather than from the mail —
+    # words that can never appear in a subject line. Repair those in place.
+    # The judgement stays the model's; only the matching is ours.
+    for rule in new_rules:
+        if preference_strength(
+            rule, payload.item.sender, payload.item.subject, payload.item.snippet
+        ):
+            continue
+        if not payload.item.sender:
+            continue
+        rule.match_sender = payload.item.sender
+        save_preference(rule)
+        repaired.append(rule.pattern)
 
     if not new_rules and payload.item.sender and decision.chosen_action:
         # The model didn't write a rule (throttled, answered in prose, or
@@ -147,5 +169,6 @@ def learn_from_decision(
             for r in new_rules
         ],
         "total_rules": len(after),
+        "repaired": repaired,
         "reply": str(reply)[:500],
     }

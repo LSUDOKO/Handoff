@@ -40,6 +40,7 @@ from handoff.graph.nodes.trigger import check_trigger
 from handoff.mcp.servers import load_agent_tools
 from handoff.memory.store import recall_preferences
 from handoff.models import WorkflowConfig
+from handoff.platform.artifacts import create_artifact
 from handoff.tools.notify import notify_user
 
 TRIGGER_PROMPT = """You confirm whether a workflow should run.
@@ -98,6 +99,7 @@ def build_executor_agent(
         classify_email,
         submit_action,
         finish_batch,
+        create_artifact,
     ]
 
     if workflow is not None and "browser" in workflow.mcp_tools:
@@ -124,6 +126,7 @@ def build_workflow_graph(
     model: Any = None,
     gate: HITLGate | None = None,
     extra_tools: list[Any] | None = None,
+    recorder: Any = None,
 ):
     """Wire trigger → executor → completer into a Strands Graph.
 
@@ -138,6 +141,8 @@ def build_workflow_graph(
             a host runtime this carries the host's already-authenticated
             tools, so Handoff uses the OAuth the user clicked through there
             rather than its own copy of every credential.
+        recorder: A ``SessionRecorder``. Bound to every node, so the step
+            trace covers the whole graph rather than just the executor.
 
     Returns:
         A built ``Graph``, ready to invoke.
@@ -171,6 +176,11 @@ def build_workflow_graph(
         description="Writes the audit trail and notifies the user",
         callback_handler=None,
     )
+
+    if recorder is not None:
+        recorder.bind(trigger_agent, "trigger")
+        recorder.bind(executor_agent, "executor")
+        recorder.bind(completer_agent, "completer")
 
     builder = GraphBuilder()
     builder.add_node(trigger_agent, "trigger")

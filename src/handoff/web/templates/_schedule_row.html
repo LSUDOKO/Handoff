@@ -1,0 +1,14 @@
+<li id="sched-{{ s.schedule_id }}">
+  <span class="r-name">
+    {{ s.workflow_name }}
+    {% if s.enabled %}<span class="pill on">enabled</span>{% else %}<span class="pill off">paused</span>{% endif %}
+  </span>
+  <span class="r-desc">{{ s.readable }}</span>
+  <span class="r-meta">{{ s.cron }} · {{ s.timezone }} · next {{ s.next_in }}{% if s.run_count %} · fired {{ s.run_count }}×{% endif %}</span>
+  <span class="r-actions">
+    <button hx-post="/schedules/{{ s.schedule_id }}/toggle" hx-target="#sched-{{ s.schedule_id }}" hx-swap="outerHTML">
+      {{ 'Pause' if s.enabled else 'Enable' }}
+    </button>
+    <button hx-post="/schedules/{{ s.schedule_id }}/run" hx-target="#sched-{{ s.schedule_id }}" hx-swap="outerHTML">Run now</button>
+  </span>
+</li>

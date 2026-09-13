@@ -1,36 +1,28 @@
 {% extends "base.html" %}
 {% block title %}Handoff — Run {{ run.run_id }}{% endblock %}
 {% block body %}
-<main>
-  <section class="standing">
-    <div><span class="v done">{{ run.auto_count }}</span><span class="k">handled on its own</span></div>
-    <div><span class="v">{{ run.interrupt_count }}</span><span class="k">you decided</span></div>
-    <div><span class="v">{{ run.memory_count }}</span><span class="k">from rules you set</span></div>
-    <div><span class="v {% if run.status == 'waiting_on_human' %}needs{% endif %}">{{ status_label }}</span><span class="k">{{ run.run_id }}</span></div>
-  </section>
+{% with title="Audit trail", subtitle=run.summary, actions='<a class="button" href="/inspector/'+run.run_id+'">Step trace</a> <a class="button" href="/">Activity</a>' %}{% include "_page_head.html" %}{% endwith %}
 
-  {% if run.summary %}
-  <p class="summary-box">{{ run.summary }}</p>
-  {% endif %}
+<section class="stat-strip">
+  <div><span class="v done">{{ run.auto_count }}</span><span class="k">handled on its own</span></div>
+  <div><span class="v">{{ run.interrupt_count }}</span><span class="k">you decided</span></div>
+  <div><span class="v">{{ run.memory_count }}</span><span class="k">from rules you set</span></div>
+  <div><span class="v {% if run.status == 'waiting_on_human' %}needs{% endif %}" style="font-size:1rem">{{ status_label }}</span><span class="k mono">{{ run.run_id }}</span></div>
+</section>
 
-  <section class="block">
-    <h2>Step by step <span class="count">{{ steps|length }} entries</span></h2>
-    <ul class="trace">
-      {% for step in steps %}
-      <li>
-        <span class="at">{{ step.at }}</span>
-        <span>
-          <span class="what">{{ step.action }}</span>
-          <span class="by {{ step.decision_by }}" style="margin-left:.6rem">{{ step.decided_label }}</span>
-          <div class="detail">
-            {% if step.item_id %}<code>{{ step.item_id }}</code> — {% endif %}{{ step.detail }}
-          </div>
-        </span>
-      </li>
-      {% endfor %}
-    </ul>
-  </section>
-
-  <p><a class="button" href="/">Back to the log</a></p>
-</main>
+<section class="block">
+  <h2>Step by step <span class="count">{{ steps|length }} entries</span></h2>
+  <ul class="trace">
+    {% for step in steps %}
+    <li>
+      <span class="at">{{ step.at }}</span>
+      <span>
+        <span class="what">{{ step.action }}</span>
+        <span class="by {{ step.decision_by }}" style="margin-left:.6rem">{{ step.decided_label }}</span>
+        <div class="detail">{% if step.item_id %}<code>{{ step.item_id }}</code> — {% endif %}{{ step.detail }}</div>
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
 {% endblock %}

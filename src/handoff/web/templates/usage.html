@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Handoff — Usage{% endblock %}
+{% block body %}
+{% with title="Usage", subtitle="What the agents cost. Rough list prices — enough to tell £2 a month from £200." %}{% include "_page_head.html" %}{% endwith %}
+
+<section class="stat-strip">
+  <div><span class="v">{{ '{:,}'.format(usage.total_tokens) }}</span><span class="k">tokens</span></div>
+  <div><span class="v">{{ usage.total_calls }}</span><span class="k">model calls</span></div>
+  <div><span class="v">{{ usage.runs }}</span><span class="k">runs</span></div>
+  <div><span class="v">{{ '{:,}'.format(usage.per_run_tokens) }}</span><span class="k">tokens per run</span></div>
+  <div><span class="v {{ 'done' if usage.total_cost == 0 else '' }}">${{ '%.2f'|format(usage.total_cost) }}</span><span class="k">estimated</span></div>
+</section>
+
+{% if usage.models %}
+<table class="grid-table">
+  <thead><tr><th>Model</th><th class="num">Calls</th><th class="num">Input</th><th class="num">Output</th><th class="num">Cost</th></tr></thead>
+  <tbody>
+    {% for m in usage.models %}
+    <tr>
+      <td><strong>{{ m.model }}</strong>{% if m.free %} <span class="pill on">free tier</span>{% endif %}
+        <div class="usage-bar"><i style="width: {{ m.share }}%"></i></div></td>
+      <td class="num">{{ m.calls }}</td>
+      <td class="num">{{ '{:,}'.format(m.input) }}</td>
+      <td class="num">{{ '{:,}'.format(m.output) }}</td>
+      <td class="num">{% if m.free %}—{% else %}${{ '%.3f'|format(m.cost) }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty-state">No usage recorded yet.</p>
+{% endif %}
+{% endblock %}

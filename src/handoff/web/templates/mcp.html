@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Handoff — Tool servers{% endblock %}
+{% block body %}
+{% with title="Tool servers", subtitle="Where the agent's tools come from. MCP servers, local or remote." %}{% include "_page_head.html" %}{% endwith %}
+
+<details class="panel">
+  <summary>Add a server</summary>
+  <div class="panel-body">
+    <form class="form-grid" hx-post="/mcp/save" hx-target="body" hx-swap="outerHTML">
+      <div class="field-row">
+        <div class="field"><label for="m-name">Name</label><input id="m-name" name="name" required placeholder="notion"></div>
+        <div class="field"><label for="m-transport">Transport</label>
+          <select id="m-transport" name="transport"><option value="stdio">stdio (a local process)</option><option value="http">http (a remote server)</option></select></div>
+      </div>
+      <div class="field"><label for="m-desc">Description</label><input id="m-desc" name="description" placeholder="Read and write Notion pages"></div>
+      <div class="field"><label for="m-cmd">Command (stdio)</label><input id="m-cmd" name="command" placeholder="npx"></div>
+      <div class="field"><label for="m-args">Arguments</label><input id="m-args" name="args" placeholder="-y @modelcontextprotocol/server-notion">
+        <span class="help">Space separated.</span></div>
+      <div class="field"><label for="m-url">URL (http)</label><input id="m-url" name="url" placeholder="https://mcp.example.com/mcp"></div>
+      <div class="field"><label for="m-env">Required environment variables</label><input id="m-env" name="required_env" placeholder="NOTION_TOKEN">
+        <span class="help">Space separated. The server is only offered to agents once these are set.</span></div>
+      <div><button type="submit">Add server</button></div>
+    </form>
+  </div>
+</details>
+
+<ul class="rows">
+  {% for s in servers %}
+  <li id="srv-{{ s.server_id }}">
+    <span class="r-name">{{ s.name }}
+      {% if s.builtin %}<span class="pill builtin">built-in</span>{% endif %}
+      {% if not s.enabled %}<span class="pill off">disabled</span>
+      {% elif s.ready %}<span class="pill on">ready</span>
+      {% else %}<span class="pill warn">needs credentials</span>{% endif %}
+    </span>
+    <span class="r-desc">{{ s.description }}{% if s.last_error %}<br><strong class="danger">{{ s.last_error }}</strong>{% endif %}</span>
+    <span class="r-meta">
+      {{ s.transport }}{% if s.command %} · {{ s.command }} {{ s.args|join(' ') }}{% endif %}{% if s.url %} · {{ s.url }}{% endif %}
+      {% if s.required_env %} · needs {{ s.required_env|join(', ') }}{% endif %}
+      {% if s.tool_names %}<br>tools: {{ s.tool_names|join(', ') }}{% endif %}
+    </span>
+    <span class="r-actions">
+      <button hx-post="/mcp/{{ s.server_id }}/probe" hx-target="body" hx-swap="outerHTML">Probe</button>
+      <button hx-post="/mcp/{{ s.server_id }}/toggle" hx-target="body" hx-swap="outerHTML">{{ 'Disable' if s.enabled else 'Enable' }}</button>
+      {% if not s.builtin %}
+      <button class="danger" hx-post="/mcp/{{ s.server_id }}/delete" hx-target="body" hx-swap="outerHTML" hx-confirm="Remove {{ s.name }}?">Remove</button>
+      {% endif %}
+    </span>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Handoff — Sessions{% endblock %}
+{% block body %}
+{% with title="Sessions", subtitle="The audit log says what it did. This says why." %}{% include "_page_head.html" %}{% endwith %}
+{% if sessions %}
+<ul class="rows">
+  {% for s in sessions %}
+  <li>
+    <span class="r-name">{{ s.workflow_name }}
+      {% if s.status == 'completed' %}<span class="pill on">done</span>
+      {% elif s.status == 'waiting_on_human' %}<span class="pill warn">needs you</span>
+      {% elif s.status == 'failed' %}<span class="pill warn">failed</span>{% endif %}
+    </span>
+    <span class="r-desc">{{ s.summary or 'No summary.' }}</span>
+    <span class="r-meta">{{ s.started }} · {{ s.model_calls }} model calls · {{ s.tool_calls }} tool calls{% if s.duration %} · {{ s.duration }}{% endif %}</span>
+    <span class="r-actions"><a class="button" href="/inspector/{{ s.run_id }}">Inspect</a></span>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty-state">No sessions yet. Run a workflow and its full trace lands here.</p>
+{% endif %}
+{% endblock %}

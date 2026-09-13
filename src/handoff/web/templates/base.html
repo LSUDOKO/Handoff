@@ -13,22 +13,60 @@
 </head>
 <body data-voice="{{ 'on' if voice_enabled else 'off' }}">
 {% block chrome %}
-<header class="masthead">
-  <div class="masthead-top">
-    <div>
-      <div class="wordmark">Handoff<span>.</span></div>
-      <p class="tagline">It ran while you were away. Here's what it did.</p>
-    </div>
-    <p class="config-status">{{ settings.provider }}: {{ settings.model_id }}{% if settings.use_mock_tools %}, synthetic inbox{% endif %}
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="/">
+      <span class="brand-mark">⌁</span>
+      <span class="brand-name">Handoff<span>.</span></span>
+    </a>
+
+    <form class="ws-switch" hx-post="/workspace/switch" hx-swap="none" hx-on::after-request="location.reload()">
+      <select name="workspace_id" onchange="this.form.requestSubmit()" aria-label="Workspace">
+        {% for w in workspaces %}
+        <option value="{{ w.workspace_id }}" {% if w.workspace_id == workspace.workspace_id %}selected{% endif %}>{{ w.icon }} {{ w.name }}</option>
+        {% endfor %}
+      </select>
+    </form>
+
+    <nav>
+      <p class="nav-group">Run</p>
+      <a href="/" {% if page == 'activity' %}aria-current="page"{% endif %}>Activity{% if stats.pending %}<span class="badge needs">{{ stats.pending }}</span>{% endif %}</a>
+      <a href="/platform" {% if page == 'platform' %}aria-current="page"{% endif %}>Workflows<span class="badge">{{ stats.workflows }}</span></a>
+      <a href="/schedules" {% if page == 'schedules' %}aria-current="page"{% endif %}>Schedules<span class="badge">{{ stats.schedules }}</span></a>
+
+      <p class="nav-group">Build</p>
+      <a href="/chat" {% if page == 'chat' %}aria-current="page"{% endif %}>Build a workflow</a>
+      <a href="/agents" {% if page == 'agents' %}aria-current="page"{% endif %}>Agents<span class="badge">{{ stats.custom_agents }}</span></a>
+      <a href="/skills" {% if page == 'skills' %}aria-current="page"{% endif %}>Skills<span class="badge">{{ stats.skills }}</span></a>
+      <a href="/discover" {% if page == 'discover' %}aria-current="page"{% endif %}>Discover</a>
+
+      <p class="nav-group">Connect</p>
+      <a href="/credentials" {% if page == 'credentials' %}aria-current="page"{% endif %}>Credentials<span class="badge">{{ stats.credentials }}</span></a>
+      <a href="/mcp" {% if page == 'mcp' %}aria-current="page"{% endif %}>Tool servers</a>
+
+      <p class="nav-group">Inspect</p>
+      <a href="/inspector" {% if page == 'inspector' %}aria-current="page"{% endif %}>Sessions</a>
+      <a href="/artifacts" {% if page == 'artifacts' %}aria-current="page"{% endif %}>Artifacts<span class="badge">{{ stats.artifacts }}</span></a>
+      <a href="/memory" {% if page == 'memory' %}aria-current="page"{% endif %}>Memory<span class="badge">{{ stats.learned_rules }}</span></a>
+      <a href="/usage" {% if page == 'usage' %}aria-current="page"{% endif %}>Usage</a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <a href="/settings" class="settings-link {% if page == 'settings' %}on{% endif %}">Settings</a>
       <button type="button" class="voice-toggle" data-role="voice-toggle" title="Read decisions and replies aloud">Voice off</button>
-    </p>
+      <p class="runtime">
+        <span class="dot {{ 'live' if scheduler.running else '' }}"></span>
+        {{ 'scheduler running' if scheduler.running else 'scheduler idle' }}
+      </p>
+      <p class="runtime">{{ settings.provider }} · {{ settings.model_id }}</p>
+    </div>
+  </aside>
+
+  <div class="content">
+    {% block body %}{% endblock %}
   </div>
-  <nav>
-    <a href="/"{% if page == 'dashboard' %} aria-current="page"{% endif %}>Log</a>
-    <a href="/chat"{% if page == 'chat' %} aria-current="page"{% endif %}>Build a workflow</a>
-  </nav>
-</header>
+</div>
 {% endblock %}
-{% block body %}{% endblock %}
+{% block bare %}{% endblock %}
 </body>
 </html>

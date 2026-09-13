@@ -29,6 +29,20 @@ ECR_REPO = "handoff"
 AGENT_NAME = "handoff"
 
 
+def which(tool: str) -> str | None:
+    """Find an executable, including one installed in the venv we run under.
+
+    ``shutil.which`` only searches PATH, so invoking this script as
+    ``.venv/bin/python infra/deploy_agentcore.py`` without activating the venv
+    reports the agentcore CLI missing when it is installed right beside the
+    interpreter running this line.
+    """
+    beside = Path(sys.executable).parent / tool
+    if beside.is_file():
+        return str(beside)
+    return shutil.which(tool)
+
+
 def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
     print(f"  $ {' '.join(cmd)}")
     return subprocess.run(cmd, check=check, text=True, capture_output=False)
@@ -46,7 +60,7 @@ def preflight() -> list[str]:
         ("aws", "https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"),
         ("docker", "https://docs.docker.com/get-docker/"),
     ]:
-        if shutil.which(tool) is None:
+        if which(tool) is None:
             problems.append(f"{tool} is not installed — {hint}")
 
     if shutil.which("aws"):
@@ -58,7 +72,7 @@ def preflight() -> list[str]:
                 "No usable AWS credentials — run `aws configure` or `aws sso login`"
             )
 
-    if shutil.which("agentcore") is None:
+    if which("agentcore") is None:
         problems.append(
             "agentcore CLI missing — pip install bedrock-agentcore-starter-toolkit"
         )
@@ -111,19 +125,19 @@ def build_and_push() -> str:
 def launch() -> None:
     print("\n[4/4] AgentCore Runtime")
     run(
-        ["agentcore", "configure", "--entrypoint", "src/handoff/app.py",
+        [which("agentcore") or "agentcore", "configure", "--entrypoint", "src/handoff/app.py",
          "--name", AGENT_NAME, "--region", config.AWS_REGION],
         check=False,
     )
-    run(["agentcore", "launch"], check=False)
+    run([which("agentcore") or "agentcore", "launch"], check=False)
 
 
 def invoke() -> None:
     print("\nSmoke test — status:")
-    run(["agentcore", "invoke", json.dumps({"type": "status"})], check=False)
+    run([which("agentcore") or "agentcore", "invoke", json.dumps({"type": "status"})], check=False)
     print("\nSmoke test — one scheduled run:")
     run(
-        ["agentcore", "invoke",
+        [which("agentcore") or "agentcore", "invoke",
          json.dumps({"type": "tick", "workflow_id": "inbox-triage-morning"})],
         check=False,
     )

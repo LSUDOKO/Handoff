@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Handoff — Discover{% endblock %}
+{% block body %}
+{% with title="Discover", subtitle="Complete setups you can import and then edit. Better than a blank page." %}{% include "_page_head.html" %}{% endwith %}
+<ul class="cards">
+  {% for t in templates %}
+  <li class="card">
+    <h3><span class="c-icon">{{ t.icon }}</span>{{ t.name }}</h3>
+    <p><strong>{{ t.tagline }}</strong></p>
+    <p>{{ t.description }}</p>
+    <div class="c-foot">
+      <span class="c-tags">{{ t.integrations|join(' · ') }}</span>
+      {% if t.installed %}
+      <span class="pill on" style="margin-left:auto">imported</span>
+      {% else %}
+      <button style="margin-left:auto" hx-post="/discover/{{ t.slug }}/install" hx-target="body" hx-swap="outerHTML">Import</button>
+      {% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

@@ -149,3 +149,151 @@ class TestPreferenceStorage:
         store_user_preference(pattern="p", action="archive", match_sender="a@b.com")
         summary = memory_summary()
         assert summary["count"] == 1 and summary["backend"] == "local"
+
+
+class TestARuleMustFireOnItsOwnItem:
+    """The invariant that makes learning actually reduce questions.
+
+    A rule written from an item but unable to match that item is worse than no
+    rule: it fails silently, the next run asks the same question, and nothing
+    in the output says why. This came from a real Nova Lite run, which wrote
+    "Archive cold outreach emails from partnerships@vendor.com" with
+    ``match_sender`` empty and keywords lifted from its own sentence —
+    "archive", "outreach", "emails" — none of which appear in a subject line.
+    """
+
+    def _unmatchable_rule(self, monkeypatch, preference_key="inbox_triage_rules"):
+        """Stand in for a model that writes the sender in prose only."""
+        from handoff.agents import learner
+        from handoff.memory.store import save_preference
+
+        def fake_agent(_model=None):
+            def run(_briefing):
+                save_preference(
+                    LearnedPreference(
+                        preference_key=preference_key,
+                        pattern="Archive cold outreach emails from partnerships@vendor.com",
+                        match_sender="",
+                        match_keywords=["archive", "cold", "outreach", "emails"],
+                        action="archive",
+                        confidence=0.5,
+                    )
+                )
+                return "stored"
+
+            return run
+
+        monkeypatch.setattr(learner, "create_learner_agent", fake_agent)
+
+    def test_an_unmatchable_rule_is_repaired_with_the_exact_sender(self, monkeypatch):
+        self._unmatchable_rule(monkeypatch)
+        payload = _payload()
+
+        result = learn_from_decision(
+            payload,
+            UserDecision(interrupt_id="i1", chosen_action="archive"),
+            preference_key="inbox_triage_rules",
+        )
+
+        assert result["repaired"], "the dead rule should have been repaired"
+        rules = list_preferences("inbox_triage_rules")
+        assert rules[0].match_sender == "partnerships@vendor.com"
+
+    def test_after_repair_the_same_item_matches(self, monkeypatch):
+        """The point of the repair: the next run does not ask again."""
+        self._unmatchable_rule(monkeypatch)
+        payload = _payload()
+
+        learn_from_decision(
+            payload,
+            UserDecision(interrupt_id="i1", chosen_action="archive"),
+            preference_key="inbox_triage_rules",
+        )
+
+        match = find_matching_preference(
+            sender=payload.item.sender,
+            subject=payload.item.subject,
+            snippet=payload.item.snippet,
+            preference_key="inbox_triage_rules",
+        )
+        assert match is not None
+        assert match.action == "archive"
+
+    def test_a_rule_that_already_matches_is_left_alone(self, monkeypatch):
+        """Don't narrow a good broad rule down to one sender."""
+        from handoff.agents import learner
+        from handoff.memory.store import save_preference
+
+        def fake_agent(_model=None):
+            def run(_briefing):
+                save_preference(
+                    LearnedPreference(
+                        preference_key="inbox_triage_rules",
+                        pattern="Archive strategic partnership pitches",
+                        match_sender="",
+                        match_keywords=["strategic", "partnership"],
+                        action="archive",
+                        confidence=0.8,
+                    )
+                )
+                return "stored"
+
+            return run
+
+        monkeypatch.setattr(learner, "create_learner_agent", fake_agent)
+
+        result = learn_from_decision(
+            _payload(),
+            UserDecision(interrupt_id="i1", chosen_action="archive"),
+            preference_key="inbox_triage_rules",
+        )
+
+        assert result["repaired"] == []
+        assert list_preferences("inbox_triage_rules")[0].match_sender == ""
+
+
+class TestPreferenceStrength:
+    def test_tiers_are_ordered_sender_then_domain_then_keywords(self):
+        from handoff.memory.store import (
+            MATCH_DOMAIN,
+            MATCH_KEYWORDS,
+            MATCH_NONE,
+            MATCH_SENDER,
+            preference_strength,
+        )
+
+        item = dict(
+            sender="partnerships@vendor.com",
+            subject="Strategic partnership",
+            snippet="a strategic integration",
+        )
+
+        def rule(**kw):
+            return LearnedPreference(
+                preference_key="k", pattern="p", action="archive", **kw
+            )
+
+        assert (
+            preference_strength(rule(match_sender="partnerships@vendor.com"), **item)
+            == MATCH_SENDER
+        )
+        assert preference_strength(rule(match_sender="@vendor.com"), **item) == MATCH_DOMAIN
+        assert (
+            preference_strength(
+                rule(match_keywords=["strategic", "partnership"]), **item
+            )
+            == MATCH_KEYWORDS
+        )
+        assert preference_strength(rule(match_keywords=["strategic"]), **item) == MATCH_NONE
+        assert preference_strength(rule(match_sender="someone@else.com"), **item) == MATCH_NONE
+
+    def test_a_subdomain_is_not_the_domain(self):
+        from handoff.memory.store import MATCH_NONE, preference_strength
+
+        rule = LearnedPreference(
+            preference_key="k", pattern="p", action="archive", match_sender="@vendor.com"
+        )
+        assert (
+            preference_strength(rule, sender="a@evil-vendor.com", subject="", snippet="")
+            == MATCH_NONE
+        )

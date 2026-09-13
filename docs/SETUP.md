@@ -73,26 +73,60 @@ HANDOFF_FAKE_MODEL=false
 ### Option C — AWS Bedrock (what the hackathon deployment uses)
 
 1. Install the AWS CLI. On Arch: `sudo pacman -S aws-cli-v2`
-2. `aws configure` — or `aws configure sso` if your org uses SSO
-3. **Enable model access.** This is the step everyone misses: an AWS account
-   does not grant Claude access by default.
-   - AWS Console → **Bedrock** → **Model access** → **Modify model access**
-   - Tick **Claude Sonnet 4.5** (and **Nova Pro** for the fallback)
-   - Submit, wait for status **Access granted**
-   - Do this in the *same region* as `AWS_REGION`
+2. **IAM → Users → Create user**, attach `AdministratorAccess` for a throwaway
+   hackathon account, then **Security credentials → Create access key → CLI**.
+3. `aws configure` — key, secret, region, `json`. Keys go here and nowhere else;
+   don't paste them into a chat or a file you might commit.
 4. In `.env`:
 
 ```bash
 HANDOFF_MODEL_PROVIDER=bedrock
-AWS_REGION=us-east-1
+AWS_REGION=ap-northeast-2      # or whichever region you chose
 HANDOFF_FAKE_MODEL=false
 ```
 
 5. `python -m handoff.cli doctor bedrock`
 
-If it says *AccessDenied*, step 3 is incomplete. If it says
-*ValidationException*, the model id doesn't exist in that region — check the
-Bedrock console's model catalogue for the exact id.
+#### Two things about Bedrock that cost us a day each
+
+**There is no "Model access" page any more.** It was retired; you no longer
+request access per model in the console. Bedrock now grants on first use, which
+means the only real test is an actual invocation — which is what `doctor` does.
+
+**Anthropic models on Bedrock are sold through AWS Marketplace, and Amazon's
+own are not.** If your account cannot complete a Marketplace agreement you get:
+
+```
+AccessDeniedException: Model access is denied due to INVALID_PAYMENT_INSTRUMENT
+```
+
+This is an account-level billing state, **not** a region or a permissions
+problem — changing region does not fix it, and neither does adding a card as
+the default payment method if the card is rejected for Marketplace
+specifically. Amazon Nova is first-party and on-demand in every Bedrock region,
+so it works on an account in that state. That is why the default is Nova Pro:
+
+```bash
+BEDROCK_MODEL_ID=amazon.nova-pro-v1:0
+# BEDROCK_MODEL_ID=global.anthropic.claude-sonnet-4-5-20250929-v1:0
+```
+
+#### Model ids carry a region prefix
+
+Current Bedrock models are not callable by their bare id — they are reached
+through a *cross-region inference profile*, whose id is prefixed by geography:
+`us.`, `apac.`, `eu.`. The prefix has to match the region you call from, so
+`us.amazon.nova-pro-v1:0` fails from Seoul. Handoff adds the right prefix for
+`AWS_REGION` automatically, so set the bare id and let it resolve:
+
+```bash
+BEDROCK_MODEL_ID=amazon.nova-pro-v1:0   # becomes apac.… in ap-northeast-2
+```
+
+An id that already names its geography is passed through untouched, which is
+how you reach the models offered only under `global.` — Claude Sonnet 4.5 among
+them, outside the US. `aws bedrock list-inference-profiles --region <region>`
+shows which prefix a given model actually has where you are.
 
 ### Verify
 

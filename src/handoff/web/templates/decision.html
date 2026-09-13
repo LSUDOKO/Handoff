@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Handoff — {{ payload.item.subject or 'Decision' }}{% endblock %}
 {% block chrome %}{% endblock %}
-{% block body %}
+{% block bare %}
 <main class="decision" id="decision">
   {% include "_decision_body.html" %}
 </main>

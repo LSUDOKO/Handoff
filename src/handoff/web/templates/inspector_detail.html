@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Handoff — Session {{ run.run_id }}{% endblock %}
+{% block body %}
+{% with title="Session", subtitle=run.summary, actions='<a class="button" href="/inspector">All sessions</a> <a class="button" href="/trace/'+run.run_id+'">Audit view</a>' %}{% include "_page_head.html" %}{% endwith %}
+
+<section class="stat-strip">
+  <div><span class="v done">{{ run.auto_count }}</span><span class="k">handled alone</span></div>
+  <div><span class="v">{{ run.interrupt_count }}</span><span class="k">you decided</span></div>
+  <div><span class="v">{{ run.memory_count }}</span><span class="k">from rules</span></div>
+  <div><span class="v">{{ session.model_calls if session else 0 }}</span><span class="k">model calls</span></div>
+  <div><span class="v">{{ session.tool_calls if session else 0 }}</span><span class="k">tool calls</span></div>
+  <div><span class="v mono" style="font-size:1rem">{{ run.run_id }}</span><span class="k">run</span></div>
+</section>
+
+{% if steps %}
+<ol class="steps">
+  {% for step in steps %}
+  <li class="step-{{ step.status }}">
+    <span class="step-n">{{ step.index }}</span>
+    <div>
+      <div class="step-head">
+        <span class="step-kind {{ step.kind }}">{{ step.kind }}</span>
+        <span class="step-name">{{ step.name }}</span>
+        {% if step.node %}<span class="step-node">{{ step.node }}</span>{% endif %}
+        {% if step.gated %}<span class="pill warn">gated</span>{% endif %}
+        {% if step.duration_ms %}<span class="step-ms">{{ step.duration_ms }}ms</span>{% endif %}
+      </div>
+      <div class="step-body">
+        {% if step.input %}
+        <span class="lbl">input</span>
+        <pre>{{ step.input_pretty }}</pre>
+        {% endif %}
+        {% if step.output %}
+        <span class="lbl">{{ 'result' if step.kind == 'tool' else 'said' }}</span>
+        <pre>{{ step.output }}</pre>
+        {% endif %}
+      </div>
+    </div>
+  </li>
+  {% endfor %}
+</ol>
+{% else %}
+<p class="empty-state">No step trace for this run.<br>Sessions are recorded from the moment the recorder was added — older runs only have the audit view.</p>
+{% endif %}
+{% endblock %}

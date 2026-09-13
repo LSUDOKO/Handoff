@@ -63,6 +63,23 @@ class WorkflowRunner:
         self.model = model if model is not None else config.get_model()
         self.store = get_store()
 
+    def _make_recorder(self, run: WorkflowRun):
+        """A step recorder for this run.
+
+        Resuming continues the same session rather than starting a second
+        one, so the inspector shows the whole story — the pause and what
+        happened after it — as one trace.
+        """
+        from handoff.platform.sessions import SessionRecorder
+
+        recorder = SessionRecorder(
+            run_id=run.run_id, workflow_id=self.workflow.workflow_id
+        )
+        existing = self.store.get_session(run.run_id)
+        if existing is not None:
+            recorder.session = existing
+        return recorder
+
     # -- gate callbacks ----------------------------------------------------
 
     def _make_gate(self, run: WorkflowRun) -> HITLGate:
@@ -126,7 +143,8 @@ class WorkflowRunner:
         )
 
         gate = self._make_gate(run)
-        graph = build_workflow_graph(self.workflow, self.model, gate)
+        recorder = self._make_recorder(run)
+        graph = build_workflow_graph(self.workflow, self.model, gate, recorder=recorder)
         ctx = RunContext(
             run_id=run.run_id, workflow_id=self.workflow.workflow_id, workflow=self.workflow
         )
@@ -139,6 +157,7 @@ class WorkflowRunner:
             with run_context(ctx):
                 result = graph(task)
         except Exception as exc:
+            recorder.save()
             run.status = RunStatus.FAILED
             run.finished_at = datetime.now(UTC)
             run.summary = f"Failed: {str(exc)[:300]}"
@@ -146,6 +165,7 @@ class WorkflowRunner:
             events.emit(run.run_id, "failed", run.summary)
             raise
 
+        recorder.save()
         return self._settle(run, graph, ctx, gate, result)
 
     # -- resume ------------------------------------------------------------
@@ -156,7 +176,8 @@ class WorkflowRunner:
             raise ValueError(f"Run {run.run_id} has no saved graph state to resume")
 
         gate = self._make_gate(run)
-        graph = build_workflow_graph(self.workflow, self.model, gate)
+        recorder = self._make_recorder(run)
+        graph = build_workflow_graph(self.workflow, self.model, gate, recorder=recorder)
         graph.deserialize_state(run.graph_state)
 
         ctx = RunContext(
@@ -196,6 +217,7 @@ class WorkflowRunner:
             events.emit(run.run_id, "resumed", f"Resuming with your {len(batch)} decision(s)")
             with run_context(ctx):
                 result = graph(responses)
+            recorder.save()
             return self._settle(run, graph, ctx, gate, result, resumed=True)
 
         # Pre-seed the gate with every interrupt this run has already raised —
@@ -232,6 +254,7 @@ class WorkflowRunner:
         with run_context(ctx):
             result = graph(responses)
 
+        recorder.save()
         return self._settle(run, graph, ctx, gate, result, resumed=True)
 
     def _describe(self, run: WorkflowRun, resumed: bool) -> RunOutcome:

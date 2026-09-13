@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Handoff — {{ skill.name }}{% endblock %}
+{% block body %}
+{% with title=skill.name, subtitle=skill.description, actions='<a class="button" href="/skills">All skills</a>' %}{% include "_page_head.html" %}{% endwith %}
+<form class="form-grid" hx-post="/skills/save" hx-target="body" hx-swap="outerHTML">
+  <input type="hidden" name="skill_id" value="{{ skill.skill_id }}">
+  <div class="field"><label for="d-md">Skill document</label>
+    <textarea id="d-md" name="markdown" style="min-height:22rem">{{ markdown }}</textarea></div>
+  <div class="page-actions"><button type="submit">Save changes</button></div>
+</form>
+{% endblock %}

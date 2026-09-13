@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Handoff — Workflows{% endblock %}
+{% block body %}
+{% with title="Workflows", subtitle="What runs, when it runs, and where the human line sits.", actions='<a class="button" href="/chat">Build a workflow</a> <a class="button" href="/discover">Import a template</a>' %}{% include "_page_head.html" %}{% endwith %}
+
+{% if workflows %}
+<ul class="flows">
+  {% for flow in workflows %}{% with flow=flow %}{% include "_workflow_row.html" %}{% endwith %}{% endfor %}
+</ul>
+{% else %}
+<p class="empty-state">No workflows in this workspace yet.<br><a href="/discover">Start from a template</a> or <a href="/chat">describe one in chat</a>.</p>
+{% endif %}
+{% endblock %}

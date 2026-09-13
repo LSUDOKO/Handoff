@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Handoff — Artifacts{% endblock %}
+{% block body %}
+{% with title="Artifacts", subtitle="Documents the runs produced — summaries, diffs, digests." %}{% include "_page_head.html" %}{% endwith %}
+{% if artifacts %}
+<ul class="rows">
+  {% for a in artifacts %}
+  <li>
+    <span class="r-name">{{ a.name }} <span class="pill off">{{ a.kind }}</span></span>
+    <span class="r-desc">{{ a.preview }}</span>
+    <span class="r-meta">{{ a.created }} · {{ a.size }} characters{% if a.run_id %} · run {{ a.run_id }}{% endif %}</span>
+    <span class="r-actions">
+      <a class="button" href="/artifacts/{{ a.artifact_id }}">Open</a>
+      <a class="button" href="/artifacts/{{ a.artifact_id }}/raw">Raw</a>
+    </span>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty-state">No artifacts yet. A workflow that produces a document — a digest, a pricing diff — saves it here.</p>
+{% endif %}
+{% endblock %}

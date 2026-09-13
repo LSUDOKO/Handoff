@@ -262,9 +262,19 @@ def check_dynamodb() -> dict[str, Any]:
         import boto3
 
         client = boto3.client("dynamodb", region_name=config.AWS_REGION)
-        for table in (config.DDB_WORKFLOWS_TABLE, config.DDB_AUDIT_TABLE, config.DDB_INTERRUPTS_TABLE):
-            client.describe_table(TableName=table)
-        return _result("DynamoDB", OK, "all three tables exist")
+        described = client.describe_table(TableName=config.DDB_TABLE)["Table"]
+        keys = "+".join(k["AttributeName"] for k in described["KeySchema"])
+        if keys != "pk+sk":
+            return _result(
+                "DynamoDB",
+                FAIL,
+                f"{config.DDB_TABLE} is keyed on {keys}, not pk+sk",
+                "Old single-key layout. Run: python infra/dynamodb_setup.py --delete "
+                "&& python infra/dynamodb_setup.py",
+            )
+        return _result(
+            "DynamoDB", OK, f"{config.DDB_TABLE} ({described['ItemCount']} items)"
+        )
     except Exception as exc:
         return _result(
             "DynamoDB", FAIL, str(exc)[:140], "Run: python infra/dynamodb_setup.py"

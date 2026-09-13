@@ -54,11 +54,34 @@ AWS_REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1"
 MODEL_PROVIDER = os.getenv("HANDOFF_MODEL_PROVIDER", "bedrock").lower()
 
 # --- Bedrock models --------------------------------------------------------
-BEDROCK_MODEL_ID = os.getenv(
-    "BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
-)
-BEDROCK_FALLBACK_MODEL_ID = os.getenv(
-    "BEDROCK_FALLBACK_MODEL_ID", "us.amazon.nova-pro-v1:0"
+# Bedrock's current models are not callable by their bare id: they are reached
+# through a cross-region inference profile whose id carries a geography prefix
+# — "us.", "apac.", "eu." — and the prefix has to match the region you call
+# from. Hardcoding "us." means the config silently cannot work outside the US,
+# so a bare model id is prefixed for whatever AWS_REGION is set to. An id that
+# already names its geography is left alone, which is how you reach the models
+# offered only under "global." (Claude Sonnet 4.5 among them, outside the US).
+_GEO_PREFIXES = ("us.", "apac.", "eu.", "ca.", "sa.", "global.")
+_GEO_BY_REGION = {"us": "us.", "ap": "apac.", "eu": "eu.", "ca": "ca.", "sa": "sa."}
+
+
+def bedrock_profile(model_id: str, region: str | None = None) -> str:
+    """Resolve a bare Bedrock model id to the inference profile for a region."""
+    if not model_id or model_id.startswith(_GEO_PREFIXES):
+        return model_id
+    geo = _GEO_BY_REGION.get((region or AWS_REGION).split("-")[0], "")
+    return f"{geo}{model_id}"
+
+
+#: Nova Pro is the default because it is first-party AWS and on-demand in every
+#: Bedrock region. Anthropic models on Bedrock are sold through AWS Marketplace,
+#: so they additionally need a payable account — an account that cannot complete
+#: a Marketplace agreement gets AccessDeniedException/INVALID_PAYMENT_INSTRUMENT
+#: no matter which region it calls. Point BEDROCK_MODEL_ID at
+#: global.anthropic.claude-sonnet-4-5-20250929-v1:0 when the account allows it.
+BEDROCK_MODEL_ID = bedrock_profile(os.getenv("BEDROCK_MODEL_ID", "amazon.nova-pro-v1:0"))
+BEDROCK_FALLBACK_MODEL_ID = bedrock_profile(
+    os.getenv("BEDROCK_FALLBACK_MODEL_ID", "amazon.nova-lite-v1:0")
 )
 
 # --- Anthropic models ------------------------------------------------------
@@ -93,9 +116,11 @@ GROQ_MAX_TOKENS = int(os.getenv("GROQ_MAX_TOKENS", "700"))
 MODEL_MAX_TOKENS = int(os.getenv("HANDOFF_MODEL_MAX_TOKENS", "8192"))
 
 # --- DynamoDB --------------------------------------------------------------
-DDB_WORKFLOWS_TABLE = os.getenv("DDB_WORKFLOWS_TABLE", "handoff_workflows")
-DDB_AUDIT_TABLE = os.getenv("DDB_AUDIT_TABLE", "handoff_audit")
-DDB_INTERRUPTS_TABLE = os.getenv("DDB_INTERRUPTS_TABLE", "handoff_interrupts")
+#: One table holds every collection, partitioned by collection name: "pk" is
+#: the collection, "sk" the item's id. Handoff keeps fourteen small
+#: collections, and fourteen tables would be fourteen things to provision and
+#: pay attention to for data that is only ever read by id or listed whole.
+DDB_TABLE = os.getenv("DDB_TABLE", "handoff")
 
 #: When false (the default) the stores persist to STATE_DIR as JSON instead of
 #: DynamoDB. This is what makes the whole project runnable with zero AWS setup.
