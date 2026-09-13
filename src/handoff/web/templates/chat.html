@@ -1,45 +1,68 @@
 {% extends "base.html" %}
 {% import "_page.html" as ui %}
-{% block title %}Chat — Handoff{% endblock %}
+{% block title %}{{ chat.title }} — Handoff{% endblock %}
+{% block head %}<script defer src="/static/chat.js"></script>{% endblock %}
 {% block body %}
 <div class="page">
-  {% call ui.title("Chat", "Describe a chore the way you'd describe it to a colleague. It comes back as a workflow you can read and run.", [{"label": workspace.name, "href": "/platform/" ~ workspace.workspace_id}]) %}
+  {% call ui.title(chat.title, "Ask this workspace, or describe a chore it should take over.", [{"label": workspace.name, "href": "/platform/" ~ workspace.workspace_id}, {"label": "Chat", "href": "/chat"}]) %}
     <span class="model-pill" title="{{ settings.provider }}"><span class="prov">{{ settings.provider[:1]|upper }}</span>{{ settings.model_id }}</span>
+    <details class="dropdown">
+      <summary class="button secondary small">{{ ui.icon('i-dots','sm') }}</summary>
+      <div class="dropdown-menu">
+        <button type="button" onclick="const t=prompt('Rename chat', {{ chat.title|tojson }}); if(t){ fetch('/chat/{{ chat.chat_id }}/rename',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'title='+encodeURIComponent(t)}).then(()=>location.reload()); }">{{ ui.icon('i-pencil','sm') }} Rename</button>
+        <hr>
+        <button type="button" class="danger" hx-post="/chat/{{ chat.chat_id }}/delete" hx-confirm="Delete this chat?" hx-target="body" hx-swap="none" hx-on::after-request="location.href='/chat'">{{ ui.icon('i-trash','sm') }} Delete</button>
+      </div>
+    </details>
   {% endcall %}
-  <div class="chat">
-    <div class="messages" id="messages">
-      <div class="inner" id="thread">
-        {% if templates_list %}
-        <section class="stack" id="templates">
-          <p class="text-faded text-xs">Start from something that already works — or just describe your own below.</p>
-          <div class="templates-grid">
-            {% for t in templates_list %}
-            <button type="button" class="template" hx-post="/chat/template/{{ t.workflow_id }}" hx-target="#thread" hx-swap="beforeend" hx-on::after-request="document.getElementById('templates').hidden = true">
-              <span class="t-name">{{ t.name }}</span><span class="t-desc">{{ t.description }}</span><span class="t-meta">{{ t.schedule }} · {{ t.tools|join(', ') }}</span>
-            </button>
-            {% endfor %}
+  <div class="chat-with-list">
+    <aside class="chat-list">
+      <form method="post" action="/chat/new"><input type="hidden" name="workspace_id" value="{{ workspace.workspace_id }}"><button class="button primary small" type="submit" style="inline-size:100%">{{ ui.icon('i-plus','sm') }} New chat</button></form>
+      <div class="ld-group">Recent</div>
+      {% for c in chats %}
+      <a class="ld-item" href="/chat/{{ c.chat_id }}" {% if c.chat_id == chat.chat_id %}aria-current="true"{% endif %}>
+        <span class="name">{{ c.title }}</span>
+        <span class="sub truncate" style="max-inline-size:100%">{{ c.preview or 'No messages yet' }}</span>
+      </a>
+      {% endfor %}
+    </aside>
+    <div class="chat" data-chat="{{ chat.chat_id }}" data-live-turn="{{ live_turn or '' }}">
+      <div class="messages" id="messages">
+        <div class="inner" id="thread">
+          {% if not blocks %}
+          <div class="message assistant">
+            <span class="speaker">Handoff</span>
+            <div class="bubble">Hi — I'm the assistant for <b>{{ workspace.name }}</b>. Ask me what ran, what's waiting on you, or describe a chore you'd like to hand off.</div>
           </div>
-        </section>
-        {% endif %}
-        <div class="message assistant">
-          <span class="speaker">Handoff</span>
-          <div class="bubble">What do you find yourself doing over and over?
-
-Describe it the way you'd describe it to a colleague — when it happens, what should happen automatically, and what you'd want to be asked about first.</div>
+          {% if templates_list %}
+          <section class="stack" id="templates">
+            <p class="text-faded text-xs">Or start from something that already works:</p>
+            <div class="templates-grid">
+              {% for t in templates_list %}
+              <button type="button" class="template" hx-post="/chat/{{ chat.chat_id }}/template/{{ t.workflow_id }}" hx-target="#thread" hx-swap="beforeend" hx-on::after-request="document.getElementById('templates').hidden = true">
+                <span class="t-name">{{ t.name }}</span><span class="t-desc">{{ t.description }}</span><span class="t-meta">{{ t.schedule }} · {{ t.tools|join(', ') }}</span>
+              </button>
+              {% endfor %}
+            </div>
+          </section>
+          {% endif %}
+          {% endif %}
+          {% for b in blocks %}{% include "_chat_block.html" %}{% endfor %}
+          {% if live_turn %}{% with turn=live_turn %}{% include "_chat_live.html" %}{% endwith %}{% endif %}
         </div>
       </div>
-    </div>
-    <div class="composer-wrap">
-      <form class="composer" hx-post="/chat/send" hx-target="#thread" hx-swap="beforeend" hx-disabled-elt="find .send"
-            hx-on::after-request="this.reset(); this.querySelector('textarea').style.height='auto'; this.querySelector('textarea').focus(); document.getElementById('messages').scrollTop = 1e9">
-        <textarea name="message" rows="1" required data-autosize data-submit-on-enter data-role="chat-input" data-role2="voice-target" autofocus placeholder="Every weekday at 8am, triage my inbox…" aria-label="Message"></textarea>
-        <div class="tools">
-          <span class="htmx-indicator">thinking…</span>
-          <button type="button" class="mic" data-role="mic" aria-label="Speak instead of typing" title="Hold to talk">{{ ui.icon('i-mic','sm') }}</button>
-          <button type="button" class="button ghost small voice-toggle" data-role="voice-toggle" title="Read replies aloud">Voice off</button>
-          <button type="submit" class="send" aria-label="Send">{{ ui.icon('i-arrow-right','sm') }}</button>
-        </div>
-      </form>
+      <div class="composer-wrap">
+        <form class="composer" hx-post="/chat/{{ chat.chat_id }}/send" hx-target="#thread" hx-swap="beforeend" hx-disabled-elt="find .send"
+              hx-on::after-request="this.reset(); this.querySelector('textarea').style.height='auto'; this.querySelector('textarea').focus();">
+          <textarea name="message" rows="1" required data-autosize data-submit-on-enter data-role="chat-input" autofocus placeholder="Every weekday at 8am, triage my inbox…" aria-label="Message"></textarea>
+          <div class="tools">
+            <span class="htmx-indicator">sending…</span>
+            <button type="button" class="mic" data-role="mic" aria-label="Speak instead of typing" title="Hold to talk">{{ ui.icon('i-mic','sm') }}</button>
+            <button type="button" class="button ghost small voice-toggle" data-role="voice-toggle" title="Read replies aloud">Voice off</button>
+            <button type="submit" class="send" aria-label="Send">{{ ui.icon('i-arrow-right','sm') }}</button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </div>

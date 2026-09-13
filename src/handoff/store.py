@@ -36,6 +36,9 @@ from handoff.models import (
 )
 from handoff.platform.models import (
     Artifact,
+    Chat,
+    ChatAgentState,
+    ChatMessage,
     Credential,
     CustomAgent,
     MCPServerConfig,
@@ -247,6 +250,9 @@ class Store:
             "artifacts", Artifact, "artifact_id")
         self.sessions = _collection("sessions", Session, "session_id")
         self.usage = _collection("usage", UsageRecord, "usage_id")
+        self.chats = _collection("chats", Chat, "chat_id")
+        self.chat_messages = _collection("chat_messages", ChatMessage, "row_id")
+        self.chat_agents = _collection("chat_agents", ChatAgentState, "row_id")
 
     # -- scoping -----------------------------------------------------------
 
@@ -408,6 +414,33 @@ class Store:
         items = self._scoped(self.sessions.all(), workspace_id)
         items.sort(key=lambda s: s.started_at, reverse=True)
         return items[:limit]
+
+    # -- chats ---------------------------------------------------------------
+
+    def list_chats(self, workspace_id: str | None = None, limit: int = 50) -> list[Chat]:
+        items = [c for c in self.chats.all() if workspace_id is None or c.workspace_id == workspace_id]
+        items.sort(key=lambda c: c.updated_at, reverse=True)
+        return items[:limit]
+
+    def get_chat(self, chat_id: str) -> Chat | None:
+        return self.chats.get("chat_id", chat_id)
+
+    def save_chat(self, chat: Chat) -> Chat:
+        return self.chats.put(chat, "chat_id")
+
+    def delete_chat(self, chat_id: str) -> None:
+        self.chats.delete("chat_id", chat_id)
+        for row in self.chat_messages.all():
+            if row.chat_id == chat_id:
+                self.chat_messages.delete("row_id", row.row_id)
+        for row in self.chat_agents.all():
+            if row.chat_id == chat_id:
+                self.chat_agents.delete("row_id", row.row_id)
+
+    def list_chat_messages(self, chat_id: str, agent_id: str = "handoff") -> list[ChatMessage]:
+        rows = [m for m in self.chat_messages.all() if m.chat_id == chat_id and m.agent_id == agent_id]
+        rows.sort(key=lambda m: m.message_id)
+        return rows
 
     def list_usage(self, workspace_id: str | None = None) -> list[UsageRecord]:
         return self._scoped(self.usage.all(), workspace_id)

@@ -94,6 +94,7 @@
     },
   };
 
+  window.handoffVoice = voice;
   try { voice.enabled = localStorage.getItem("handoff:voice") === "on"; } catch (_) {}
 
   function bindToggle() {

@@ -1,0 +1,8 @@
+<div class="tool-card">
+  <div class="tool-head"><svg class="icon sm"><use href="/static/icons.svg#i-flow"/></svg><span class="name">Workflow config</span><span class="badge success">ready</span></div>
+  <pre>{{ config_json }}</pre>
+  <div class="row">
+    <button class="button accent small" hx-post="/chat/save" hx-vals='{"config": {{ config_json_attr }} }' hx-target="#thread" hx-swap="beforeend">Save and switch on</button>
+    <span class="text-faded text-xs">Saved workflows show up in Workflows and can run on their schedule.</span>
+  </div>
+</div>

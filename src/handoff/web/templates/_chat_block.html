@@ -1,0 +1,17 @@
+{% if b.kind == 'user' %}
+<div class="message user"><div class="bubble">{{ b.text }}</div></div>
+{% elif b.kind == 'assistant' %}
+<div class="message assistant">
+  <span class="speaker">Handoff</span>
+  {% if b.text %}<div class="bubble">{{ b.text }}</div>{% endif %}
+  {% if b.config %}{% with config_json=b.config, config_json_attr=b.config_attr %}{% include "_chat_config.html" %}{% endwith %}{% endif %}
+</div>
+{% elif b.kind == 'tool' %}
+<div class="message assistant">
+  <details class="tool-card {{ 'error' if b.status == 'error' else '' }}">
+    <summary class="tool-head"><svg class="icon sm"><use href="/static/icons.svg#i-bolt"/></svg><span class="name">{{ b.name }}</span><span class="badge {{ 'error' if b.status == 'error' else 'success' }}">{{ b.status }}</span></summary>
+    {% if b.input and b.input != '{}' %}<pre>{{ b.input }}</pre>{% endif %}
+    {% if b.output %}<pre>{{ b.output }}</pre>{% endif %}
+  </details>
+</div>
+{% endif %}

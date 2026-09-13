@@ -394,6 +394,18 @@ def dashboard(request: Request):
     )
 
 
+@app.get("/activity/item/{interrupt_id}", response_class=HTMLResponse)
+def activity_item(request: Request, interrupt_id: str):
+    payload = get_store().get_interrupt(interrupt_id)
+    if payload is None:
+        raise HTTPException(404, "That decision no longer exists")
+    return templates.TemplateResponse(
+        request=request,
+        name="_activity_item.html",
+        context={**_context(request, "activity"), "d": _decision_context(request, payload)},
+    )
+
+
 @app.post("/activity/{interrupt_id}/decide", response_class=HTMLResponse)
 def activity_decide(
     request: Request, interrupt_id: str, action: str = Form(...), note: str = Form("")
@@ -475,84 +487,160 @@ def make_decision(
     )
 
 
-@app.get("/chat", response_class=HTMLResponse)
-def chat_page(request: Request):
-    """Describe a chore; get a workflow back."""
+def _chat_page(request: Request, chat_id: str):
+    from handoff.chat import get_chat_service
+
+    svc = get_chat_service()
+    chat = svc.get(chat_id)
+    if chat is None:
+        raise HTTPException(404, "No such chat")
+    workspace = get_store().get_workspace(chat.workspace_id) or _workspace()
+    _ACTIVE_WORKSPACE["id"] = workspace.workspace_id
+    blocks = svc.history(chat_id)
     return templates.TemplateResponse(
         request=request,
         name="chat.html",
         context=_context(
             request,
             "chat",
+            workspace=workspace,
+            chat=chat,
+            chats=svc.list(workspace.workspace_id),
+            blocks=blocks,
+            live_turn=svc.is_busy(chat_id),
             templates_list=[
                 {"workflow_id": w.workflow_id, "name": w.name, "description": w.description,
                  "tools": w.mcp_tools, "schedule": _schedule_line(w)}
                 for w in load_example_workflows()
-            ],
-            voice_enabled=stt_available(),
+            ] if not blocks else [],
         ),
     )
 
 
-@app.post("/chat/send", response_class=HTMLResponse)
-def chat_send(request: Request, message: str = Form(...)):
-    """One turn with the Builder Agent."""
-    session_id = request.cookies.get("handoff_session", "default")
-    session = _SESSIONS.setdefault(session_id, BuilderSession())
+@app.get("/chat")
+def chat_entry(request: Request):
+    """Open the workspace's latest chat, or start its first."""
+    from handoff.chat import get_chat_service
+
+    svc = get_chat_service()
+    workspace = _workspace()
+    chat = svc.latest(workspace.workspace_id) or svc.create(workspace.workspace_id)
+    seed = request.query_params.get("seed")
+    return RedirectResponse(f"/chat/{chat.chat_id}" + ("?seed=1" if seed else ""), status_code=303)
+
+
+@app.post("/chat/new")
+def chat_new(workspace_id: str = Form("")):
+    from handoff.chat import get_chat_service
+
+    workspace = get_store().get_workspace(workspace_id) if workspace_id else None
+    chat = get_chat_service().create((workspace or _workspace()).workspace_id)
+    return RedirectResponse(f"/chat/{chat.chat_id}", status_code=303)
+
+
+@app.get("/chat/{chat_id}", response_class=HTMLResponse)
+def chat_page(request: Request, chat_id: str):
+    return _chat_page(request, chat_id)
+
+
+@app.post("/chat/{chat_id}/send", response_class=HTMLResponse)
+def chat_send(request: Request, chat_id: str, message: str = Form(...)):
+    """Append the person's turn and a live placeholder that streams the reply."""
+    from handoff.chat import get_chat_service
 
     try:
-        result = session.send(message)
-        reply, cfg = result["reply"], result["config"]
-    except Exception as exc:
-        reply, cfg = (
-            f"I couldn't reach the model just now: {exc}\n\n"
-            "Check your AWS credentials and Bedrock model access, or set "
-            "HANDOFF_FAKE_MODEL=true to try the flow offline.",
-            None,
-        )
-
-    config_json = json.dumps(cfg, indent=2) if cfg else ""
-    response = templates.TemplateResponse(
-        request=request,
-        name="_chat_turns.html",
-        context={
-            "user_message": message,
-            "reply": reply,
-            "config_json": config_json,
-            "config_json_attr": json.dumps(config_json) if cfg else "null",
-        },
+        turn = get_chat_service().send(chat_id, message)
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except KeyError as exc:
+        raise HTTPException(404, "No such chat") from exc
+    return templates.TemplateResponse(
+        request=request, name="_chat_sent.html", context={"text": message, "turn": turn}
     )
-    response.set_cookie("handoff_session", session_id, httponly=True, samesite="lax")
-    return response
+
+
+@app.post("/chat/{chat_id}/template/{workflow_id}", response_class=HTMLResponse)
+def chat_from_template(request: Request, chat_id: str, workflow_id: str):
+    workflow = next((w for w in load_example_workflows() if w.workflow_id == workflow_id), None)
+    if workflow is None:
+        raise HTTPException(404, "No such template")
+    message = (
+        f"Set up the '{workflow.name}' template for me: {workflow.description} "
+        f"Show me the config and tell me where the human line sits before saving."
+    )
+    return chat_send(request, chat_id, message)
+
+
+@app.get("/chat/{chat_id}/events")
+def chat_events(chat_id: str, turn: int = 0):
+    def stream():
+        for event in events.subscribe(f"chat:{chat_id}", replay=True):
+            kind = event.get("kind", "note")
+            if kind == "keepalive":
+                yield ": keepalive\n\n"
+                continue
+            if turn and int(event.get("turn", 0) or 0) != turn:
+                continue
+            yield f"event: {kind}\ndata: {json.dumps(event, default=str)}\n\n"
+            if kind in ("done", "error"):
+                yield "event: end\ndata: {}\n\n"
+                return
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/chat/{chat_id}/rename")
+def chat_rename(chat_id: str, title: str = Form(...)):
+    from handoff.chat import get_chat_service
+
+    get_chat_service().rename(chat_id, title)
+    return {"ok": True}
+
+
+@app.post("/chat/{chat_id}/delete")
+def chat_delete(chat_id: str):
+    from handoff.chat import get_chat_service
+
+    get_chat_service().delete(chat_id)
+    return {"ok": True}
 
 
 @app.post("/chat/save", response_class=HTMLResponse)
 def chat_save(request: Request, config: str = Form(...)):
-    """Save the config the Builder just produced."""
+    """Save the config the assistant just produced."""
     from handoff.models import WorkflowConfig, WorkflowStatus
 
     try:
         parsed = json.loads(config)
     except json.JSONDecodeError as exc:
-        return HTMLResponse(f'<div class="turn"><div class="body">That config is not valid JSON: {exc}</div></div>')
+        return HTMLResponse(
+            f'<div class="message assistant"><div class="callout error">That config is not valid JSON: {exc}</div></div>'
+        )
 
     result = validate_config_dict(parsed)
     if not result["valid"]:
-        problems = "\n".join(f"- {e}" for e in result["errors"])
+        problems = "".join(f"<li>{e}</li>" for e in result["errors"])
         return HTMLResponse(
-            f'<div class="turn"><p class="speaker">Handoff</p><div class="body">'
-            f"I can't save that yet:\n{problems}</div></div>"
+            f'<div class="message assistant"><div class="callout warn">I can\'t save that yet:<ul>{problems}</ul></div></div>'
         )
 
     workflow = WorkflowConfig.model_validate(result["config"])
     workflow.status = WorkflowStatus.ACTIVE
     get_store().save_workflow(workflow)
+    from handoff.daemon import sync_schedules
 
+    try:
+        sync_schedules()
+    except Exception:
+        pass
+    ws = _workspace().workspace_id
     return HTMLResponse(
-        f'<div class="turn"><p class="speaker">Handoff</p><div class="body">'
-        f'Saved <strong>{workflow.name}</strong> and switched it on. '
-        f'<a href="/">See it in the log</a> — or press Run now to watch it go.'
-        f"</div></div>"
+        f'<div class="message assistant"><div class="bubble">Saved <b>{workflow.name}</b> and switched it on. '
+        f'<a class="text-bright" href="/platform/{ws}/workflows">See it in Workflows</a> — or say "run it" to watch it go.</div></div>'
     )
 
 
@@ -666,34 +754,6 @@ def voice_status():
 
 
 # --- templates -------------------------------------------------------------------
-
-
-@app.post("/chat/template/{workflow_id}", response_class=HTMLResponse)
-def chat_from_template(request: Request, workflow_id: str):
-    """Start the builder from one of the shipped templates."""
-    workflow = next((w for w in load_example_workflows() if w.workflow_id == workflow_id), None)
-    if workflow is None:
-        raise HTTPException(404, "No such template")
-    cfg = workflow.model_dump(mode="json", exclude={"created_at", "updated_at", "status"})
-    config_json = json.dumps(cfg, indent=2)
-    return templates.TemplateResponse(
-        request=request,
-        name="_chat_turns.html",
-        context={
-            "user_message": f"Start from the {workflow.name} template",
-            "reply": (
-                f"Here's {workflow.name}. It runs {_schedule_line(workflow)} and uses "
-                f"{', '.join(workflow.mcp_tools)}.\n\n{workflow.description}\n\n"
-                "Tell me what to change — the schedule, the channel, what counts as "
-                "urgent — or save it as is."
-            ),
-            "config_json": config_json,
-            "config_json_attr": json.dumps(config_json),
-        },
-    )
-
-
-# --- machine-readable endpoints (for scripts and external callers) --------
 
 
 @app.get("/api/pending")
@@ -1537,7 +1597,7 @@ def api_session(run_id: str):
 
 _SECTIONS = {
     "activity": lambda request: dashboard(request),
-    "chat": lambda request: chat_page(request),
+    "chat": lambda request: chat_entry(request),
     "agents": lambda request: agents_page(request),
     "skills": lambda request: skills_page(request),
     "workflows": lambda request: platform_page(request),

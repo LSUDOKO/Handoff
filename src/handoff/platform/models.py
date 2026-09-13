@@ -320,3 +320,52 @@ class UsageRecord(BaseModel):
     @property
     def total_tokens(self) -> int:
         return self.input_tokens + self.output_tokens
+
+
+# --- Chat --------------------------------------------------------------------
+
+
+class Chat(BaseModel):
+    """One conversation with the workspace's assistant.
+
+    The messages themselves are the Strands session — persisted through a
+    SessionRepository backed by the same store — so a chat survives a restart
+    and lives in DynamoDB when deployed. This row is the index entry: what to
+    show in the list, and which agent the thread belongs to.
+    """
+
+    chat_id: str = Field(default_factory=lambda: new_id("chat"))
+    workspace_id: str = ""
+    agent_id: str = "handoff"
+    title: str = "New chat"
+    preview: str = ""
+    turns: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)
+
+
+class ChatMessage(BaseModel):
+    """A Strands session message, stored one row per message."""
+
+    row_id: str = ""
+    chat_id: str = ""
+    agent_id: str = "handoff"
+    message_id: int = 0
+    message: dict[str, Any] = Field(default_factory=dict)
+    redact_message: dict[str, Any] | None = None
+    created_at: str = ""
+    updated_at: str = ""
+
+
+class ChatAgentState(BaseModel):
+    """The Strands SessionAgent record: state and conversation-manager state."""
+
+    row_id: str = ""
+    chat_id: str = ""
+    agent_id: str = "handoff"
+    state: dict[str, Any] = Field(default_factory=dict)
+    conversation_manager_state: dict[str, Any] = Field(default_factory=dict)
+    created_at: str = ""
+    updated_at: str = ""

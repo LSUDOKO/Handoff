@@ -212,3 +212,12 @@ input[type="range"] { accent-color: var(--blue); inline-size: 100%; }
 .live-state.needs { color: var(--needs-you); }
 .live-state.done { color: var(--green); }
 .mic.listening { background: var(--red); color: white; animation: pulse 1s ease-in-out infinite; }
+
+/* ---- Chat v2 --------------------------------------------------------------------- */
+.turn-body { display: flex; flex-direction: column; gap: var(--size-2); }
+.bubble.thinking { color: var(--text-faded); display: inline-flex; align-items: center; gap: var(--size-2); }
+.tool-card summary { cursor: pointer; }
+.tool-card.running .name { color: var(--text); }
+.tool-card.error { border-color: color-mix(in srgb, var(--red), transparent 60%); }
+.waiting-card.in-chat { max-inline-size: 720px; }
+.message.assistant > .actions-row { padding-inline: var(--size-3); }
