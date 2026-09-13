@@ -24,14 +24,16 @@ from strands import tool
 from handoff import events
 from handoff.store import get_store
 
-#: The events channel of the chat whose turn is running, or "" outside one.
+#: The events channel of the chat whose turn is running, or "" outside one,
+#: and that turn's number — the page follows one turn at a time.
 current_channel: ContextVar[str] = ContextVar("handoff_chat_channel", default="")
+current_turn: ContextVar[int] = ContextVar("handoff_chat_turn", default=0)
 
 
 def _emit(kind: str, text: str, **data) -> None:
     channel = current_channel.get()
     if channel:
-        events.emit(channel, kind, text, **data)
+        events.emit(channel, kind, text, turn=current_turn.get(), **data)
 
 
 @tool
@@ -40,8 +42,10 @@ def activate_workflow(config_json: str) -> dict:
 
     Use this when the person has asked you to set up a chore and you have
     designed the config: pass the complete JSON. It is validated, saved,
-    activated, and scheduled if it has a cron trigger. Tell them in one
-    sentence what you set up and when it will next run.
+    activated, and scheduled if it has a cron trigger. Call it even when
+    validate_workflow reported warnings — a warning that an integration is
+    not configured yet is informational, not a reason to wait. Tell them in
+    one sentence what you set up and when it will next run.
 
     Args:
         config_json: The full workflow config as a JSON string, matching the

@@ -887,6 +887,16 @@ def orb_chat_id():
     return {"chat_id": chat.chat_id, "workspace_id": workspace.workspace_id}
 
 
+@app.post("/orb/reset")
+def orb_reset():
+    """Start the spoken conversation over. Workflows and runs it created stay."""
+    from handoff.chat import get_chat_service
+
+    workspace = _workspace()
+    get_chat_service().reset_voice_chat(workspace.workspace_id)
+    return RedirectResponse("/orb", status_code=303)
+
+
 @app.post("/orb/{chat_id}/send")
 def orb_send(chat_id: str, message: str = Form(...)):
     """One spoken (or typed) turn on the voice chat. Returns the turn to follow."""

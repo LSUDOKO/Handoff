@@ -109,7 +109,13 @@
       worklet.port.onmessage = null; orb.setLevel(0);
       setMode("thinking", "Transcribing…");
       let text = null;
-      if (ws) { try { if (ws.readyState === 1) ws.send(JSON.stringify({ type: "end" })); text = await Promise.race([done, new Promise((r) => setTimeout(() => r(null), 12000))]); } catch { text = null; } try { ws.close(); } catch {} }
+      if (ws) {
+        // Wait briefly for the final; the stabilised partial is already on
+        // screen and is what a person would accept, so use it if the final is slow.
+        try { if (ws.readyState === 1) ws.send(JSON.stringify({ type: "end" })); text = await Promise.race([done, new Promise((r) => setTimeout(() => r(undefined), 2500))]); } catch { text = null; }
+        if (text === undefined) text = [...finals, live].join(" ").trim() || null;
+        try { ws.close(); } catch {}
+      }
       if (text == null) text = await uploadTranscribe(chunks);
       transcript.classList.remove("partial");
       await heard(text);

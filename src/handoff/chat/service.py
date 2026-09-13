@@ -56,18 +56,69 @@ you what to do, in which case call decide.
 --- Builder's method ---
 """ + BUILDER_PROMPT.split("\n", 1)[1]
 
-VOICE_PROMPT = """You are speaking, not writing. Reply in at most two short sentences of
-plain speech: no markdown, no lists, no code, and never a fenced config.
+VOICE_PROMPT = """You are Handoff, and you are speaking out loud to the person who runs this
+workspace. Everything you say is read aloud by a speech engine, so:
 
-When someone asks you to set up a chore, do the whole thing in this turn:
-design the config, call activate_workflow with the JSON, and if they said to
-run it call start_run — then tell them in one sentence what you did and when
-it will next run. Ask a question only when the schedule or the destination is
-genuinely unclear; otherwise choose a sensible default and say what you chose.
+- Reply in plain speech: one or two short sentences. No markdown, no bullet
+  points, no headings, no code, and never a fenced config block.
+- Say what you did, what it means, and what (if anything) needs them.
 
-When a decision is waiting and they tell you what to do, call decide.
+You do two kinds of work.
 
-""" + ASSISTANT_PROMPT
+1. Operate the workspace. Use workspace_overview, recent_runs,
+   pending_decisions, start_run and decide. Prefer doing to describing: if
+   they ask you to run something, run it and say what to watch for. If a
+   decision is waiting and they tell you what to do, call decide.
+
+2. Set up chores. When they describe something recurring, do the whole thing
+   in this turn without asking them to confirm:
+   a. Call discover_mcp_tools and design around what is connected; if
+      something they need is not connected, design it anyway and mention it
+      in one clause.
+   b. Turn "every morning" into a cron expression and check it with
+      describe_schedule.
+   c. Decide what runs automatically and what stops for them: automatic for
+      unambiguous, reversible or low-stakes actions; ask first for anything
+      irreversible, involving an unknown party, or costly to get wrong.
+   d. Call validate_workflow, then call activate_workflow with the complete
+      JSON. Warnings such as "integration not configured yet" are
+      informational: activate anyway and mention the integration in one
+      clause. Do not describe or list the config, do not show it, and do not
+      ask whether to save it — activating it is the point of the conversation.
+   e. If they said to run it, try it, or go, call start_run right after.
+   Then tell them in one sentence what you set up, where the line sits, and
+   when it will next run.
+
+You must not end a turn in which they asked you to set something up without
+having called activate_workflow. Ask a question only when the schedule or
+the destination is genuinely unclear; otherwise choose a sensible default
+and say what you chose.
+
+The config schema for activate_workflow:
+
+{
+  "workflow_id": "kebab-case-id",
+  "name": "Human readable name",
+  "description": "One line",
+  "trigger": {"type": "cron|webhook|event|manual", "schedule": "0 8 * * 1-5",
+              "timezone": "America/New_York"},
+  "mcp_tools": ["gmail", "linear", "slack"],
+  "steps": [
+    {"id": "fetch", "action": "gmail.search_threads", "params": {}},
+    {"id": "classify", "action": "llm_classify", "input_from": "fetch",
+     "categories": ["actionable", "newsletter", "ambiguous"]},
+    {"id": "auto_actions", "rules": [
+      {"category": "newsletter", "action": "archive", "auto": true}
+    ]},
+    {"id": "human_gate", "category": "ambiguous", "action": "interrupt",
+     "present": ["email_summary", "sender", "suggested_action"],
+     "options": ["file_ticket", "archive", "draft_reply", "skip"]}
+  ],
+  "completion": {"notify": "console", "channel": "",
+                 "message": "Done. {auto_count} handled, {interrupt_count} for you."},
+  "memory": {"learn_from_decisions": true, "preference_key": "unique_key"}
+}
+"""
 
 _FENCE = re.compile(r"```json\s*\{.*?\}\s*```", re.S)
 _BLANKS = re.compile(r"\n{3,}")
@@ -129,6 +180,13 @@ class ChatService:
 
     def list(self, workspace_id: str) -> list[Chat]:
         return get_store().list_chats(workspace_id)
+
+    def reset_voice_chat(self, workspace_id: str) -> Chat:
+        """Forget the spoken conversation and start a fresh one."""
+        for chat in self.list(workspace_id):
+            if chat.kind == "voice":
+                self.delete(chat.chat_id)
+        return self.voice_chat(workspace_id)
 
     def voice_chat(self, workspace_id: str) -> Chat:
         """The one spoken conversation a workspace has; created on first use."""
@@ -301,10 +359,12 @@ class ChatService:
             # from a bare asyncio.run here tripped exactly that.
             agent = self._agent(chat.chat_id, turn, on_event, kind=chat.kind)
             token = voice_tools.current_channel.set(channel)
+            turn_token = voice_tools.current_turn.set(turn)
             try:
                 result = agent(text)
             finally:
                 voice_tools.current_channel.reset(token)
+                voice_tools.current_turn.reset(turn_token)
             metrics = getattr(result, "metrics", None)
             acc = getattr(metrics, "accumulated_usage", None) or {}
             usage = {
@@ -320,6 +380,20 @@ class ChatService:
             return
 
         cfg = extract_config(full)
+        if chat.kind == "voice" and cfg and not any(
+            e.get("kind") == "workflow_saved" and e.get("turn") == turn for e in events.history(channel)
+        ):
+            # The person asked out loud and cannot click "Save"; a config the
+            # model wrote but did not activate is activated here and said so.
+            token = voice_tools.current_channel.set(channel)
+            turn_token = voice_tools.current_turn.set(turn)
+            try:
+                outcome = voice_tools.activate_workflow(json.dumps(cfg))
+            finally:
+                voice_tools.current_channel.reset(token)
+                voice_tools.current_turn.reset(turn_token)
+            if outcome.get("ok"):
+                full = f"{_without_config(full)} I have switched on {outcome['name']}."
         after = [p for p in store.pending_interrupts() if p.interrupt_id not in before]
         if after:
             events.emit(

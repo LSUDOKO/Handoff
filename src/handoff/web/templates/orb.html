@@ -19,6 +19,7 @@
     <span class="orb-ws"><span class="ws-dot" data-color="{{ workspace.color }}"></span>{{ workspace.name }}</span>
     <span class="orb-engine" title="What hears you and speaks back">{{ ui.icon('i-mic','xs') }} {{ {'aws': 'Amazon Transcribe · Polly ' ~ speech.voice, 'groq': 'Groq Whisper · Orpheus', 'browser': 'Browser speech'}[speech.provider] }}</span>
     <label class="orb-handsfree"><input type="checkbox" data-role="handsfree"> Hands-free</label>
+    <form method="post" action="/orb/reset" onsubmit="return confirm('Start the conversation over? Workflows it created stay.')"><button class="button ghost small" type="submit" title="Forget this conversation">{{ ui.icon('i-rotate','xs') }} Start over</button></form>
   </header>
 
   <section class="orb-stage" aria-live="polite">

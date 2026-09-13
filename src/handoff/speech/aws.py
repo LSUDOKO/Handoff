@@ -60,7 +60,9 @@ class LiveTranscription:
             media_sample_rate_hz=rate,
             media_encoding="pcm",
             enable_partial_results_stabilization=True,
-            partial_results_stability="high",
+            # "medium" settles a partial a beat sooner than "high"; the page
+            # shows partials live and takes the last one if the final is slow.
+            partial_results_stability="medium",
         )
         session = cls(stream)
         session._reader = asyncio.create_task(session._read())

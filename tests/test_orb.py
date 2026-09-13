@@ -67,7 +67,7 @@ class TestRunNarrator:
 class TestVoiceTools:
     def test_activate_workflow_saves_and_emits(self):
         from handoff import events
-        from handoff.chat.voice_tools import activate_workflow, current_channel
+        from handoff.chat.voice_tools import activate_workflow, current_channel, current_turn
         from handoff.store import get_store
 
         cfg = {
@@ -76,14 +76,17 @@ class TestVoiceTools:
             "mcp_tools": ["gmail"], "steps": [],
         }
         token = current_channel.set("chat:t1")
+        turn_token = current_turn.set(3)
         try:
             out = activate_workflow(json.dumps(cfg))
         finally:
             current_channel.reset(token)
+            current_turn.reset(turn_token)
         assert out["workflow_id"] == "voice-test" and out["status"] == "active"
         assert get_store().get_workflow("voice-test").status.value == "active"
         saved = [e for e in events.history("chat:t1") if e["kind"] == "workflow_saved"]
         assert saved and saved[0]["config"]["name"] == "Voice test" and saved[0]["workflow_id"] == "voice-test"
+        assert saved[0]["turn"] == 3  # the page follows one turn; the event must carry it
 
     def test_activate_workflow_rejects_bad_json(self):
         from handoff.chat.voice_tools import activate_workflow
@@ -128,7 +131,10 @@ class TestVoiceChat:
         a = svc.voice_chat(ws.workspace_id)
         b = svc.voice_chat(ws.workspace_id)
         assert a.chat_id == b.chat_id and a.kind == "voice" and a.title == "Voice"
-        assert all(c.kind == "chat" for c in svc.list(ws.workspace_id) if c.chat_id != a.chat_id)
+        fresh = svc.reset_voice_chat(ws.workspace_id)
+        assert fresh.chat_id != a.chat_id and svc.voice_chat(ws.workspace_id).chat_id == fresh.chat_id
+        assert sum(c.kind == "voice" for c in svc.list(ws.workspace_id)) == 1
+        assert all(c.kind == "chat" for c in svc.list(ws.workspace_id) if c.chat_id != fresh.chat_id)
 
 
 class TestOrbRoutes:
