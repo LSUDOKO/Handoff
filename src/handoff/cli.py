@@ -37,6 +37,15 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("workflows", help="List saved workflows")
     sub.add_parser("rules", help="List the rules it has learned from you")
 
+    p_ws = sub.add_parser("workspace", help="Export or import a workspace.yml / bundle")
+    ws_sub = p_ws.add_subparsers(dest="ws_command", required=True)
+    p_ws_export = ws_sub.add_parser("export", help="Write workspace.yml (or a .zip bundle) to a path")
+    p_ws_export.add_argument("path", help="Where to write; .zip for a bundle, anything else for YAML")
+    p_ws_export.add_argument("--workspace", default="", help="Workspace id (default: the default workspace)")
+    p_ws_import = ws_sub.add_parser("import", help="Create a workspace from a workspace.yml or bundle")
+    p_ws_import.add_argument("path")
+    ws_sub.add_parser("list", help="List workspaces")
+
     p_doctor = sub.add_parser(
         "doctor", help="Check which credentials actually work"
     )
@@ -61,6 +70,31 @@ def main(argv: list[str] | None = None) -> int:
     config.configure_observability()
     seed_examples()
     store = get_store()
+
+    if args.command == "workspace":
+        from pathlib import Path
+
+        from handoff.platform import workspace_yaml
+
+        if args.ws_command == "list":
+            for ws in store.list_workspaces():
+                print(f"{ws.workspace_id}  {ws.name}{'  (default)' if ws.is_default else ''}")
+            return 0
+        if args.ws_command == "export":
+            workspace_id = args.workspace or store.default_workspace().workspace_id
+            target = Path(args.path)
+            if target.suffix == ".zip":
+                target.write_bytes(workspace_yaml.bundle(workspace_id))
+            else:
+                target.write_text(workspace_yaml.to_yaml(workspace_id))
+            print(f"wrote {target}")
+            return 0
+        if args.ws_command == "import":
+            source = Path(args.path)
+            result = workspace_yaml.import_document(source.read_bytes(), source.name)
+            print(f"imported '{result['name']}' as {result['workspace_id']}: "
+                  f"{result['workflows']} workflows, {result['skills']} skills, {result['agents']} agents")
+            return 0
 
     if args.command == "run":
         from handoff.agents.executor import run_workflow

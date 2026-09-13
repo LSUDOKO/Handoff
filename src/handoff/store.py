@@ -45,6 +45,7 @@ from handoff.platform.models import (
     MCPServerConfig,
     MemoryEntry,
     MemoryStore,
+    Profile,
     Schedule,
     Session,
     Skill,
@@ -252,6 +253,7 @@ class Store:
         self.sessions = _collection("sessions", Session, "session_id")
         self.usage = _collection("usage", UsageRecord, "usage_id")
         self.chats = _collection("chats", Chat, "chat_id")
+        self.profile = _collection("profile", Profile, "profile_id")
         self.agent_runs = _collection("agent_runs", AgentRun, "run_id")
         self.chat_messages = _collection("chat_messages", ChatMessage, "row_id")
         self.chat_agents = _collection("chat_agents", ChatAgentState, "row_id")
@@ -416,6 +418,14 @@ class Store:
         items = self._scoped(self.sessions.all(), workspace_id)
         items.sort(key=lambda s: s.started_at, reverse=True)
         return items[:limit]
+
+    # -- profile ---------------------------------------------------------------------
+
+    def get_profile(self) -> Profile:
+        return self.profile.get("profile_id", "me") or Profile()
+
+    def save_profile(self, profile: Profile) -> Profile:
+        return self.profile.put(profile, "profile_id")
 
     # -- agent workbench ---------------------------------------------------------
 

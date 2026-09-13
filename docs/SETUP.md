@@ -236,25 +236,33 @@ and returns when that run completes or stops for you.
 
 ### AWS (runs when your laptop is shut)
 
+Six scripts, in this order. Each prints what to do next.
+
 ```bash
-python infra/deploy_agentcore.py --check     # what's missing
-python infra/deploy_agentcore.py             # build arm64 → ECR → AgentCore
-python infra/memory_setup.py                 # learned rules persist in AWS
-python infra/dynamodb_setup.py               # durable audit trail
-python infra/eventbridge_setup.py --list     # preview the cron conversion
-python infra/eventbridge_setup.py --target-arn <arn> --role-arn <arn>
+python infra/dynamodb_setup.py              # one table, pk = collection, sk = id
+python infra/memory_setup.py                # AgentCore Memory → AGENTCORE_MEMORY_ID in .env
+python infra/deploy_agentcore.py            # arm64 image → ECR → AgentCore Runtime (boto3)
+python infra/iam_setup.py                   # the role EventBridge Scheduler assumes
+python infra/lambda_setup.py --runtime-arn <arn from deploy>
+python infra/eventbridge_setup.py --target-arn <lambda arn> --role-arn <scheduler role arn>
 ```
 
-Two things to know:
+Set `USE_DYNAMODB=true` and `USE_AGENTCORE_MEMORY=true` in `.env` *before*
+deploying: the runtime is told those settings at launch, and a container's
+filesystem is ephemeral, so a deployment without them forgets every run.
 
-- **arm64 is required** by AgentCore Runtime. On an x86 machine you need
-  `qemu-user-static` installed for the cross-build, or Docker will fail with
-  `exec format error`. On Arch: `sudo pacman -S qemu-user-static-binfmt`
-- **The EventBridge conversion is not a pass-through.** Unix cron
-  `0 8 * * 1-5` becomes `cron(0 8 ? * 2-6 *)` — EventBridge counts weekdays
-  from 1=Sunday. `--list` shows you the conversion before anything is created.
+Two things that are not obvious:
 
----
+- **The Python `agentcore` CLI is deprecated** and `launch` fails on a missing
+  config file while an older deploy script printed "Deployed." over it.
+  `deploy_agentcore.py` now creates the runtime through the control-plane API
+  directly and waits for `READY`.
+- **EventBridge Scheduler cannot target AgentCore Runtime** — `CreateSchedule`
+  rejects it. The schedule fires a Lambda that forwards the tick with
+  `InvokeAgentRuntime`; `lambda_setup.py` creates it and its role.
+
+Building the image on an x86 machine needs QEMU for arm64:
+`docker run --privileged --rm tonistiigi/binfmt --install arm64` once.
 
 ## Step 5 — Use it as a desktop app, by voice
 

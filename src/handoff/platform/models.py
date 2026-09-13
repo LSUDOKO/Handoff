@@ -393,3 +393,25 @@ class AgentRun(BaseModel):
     duration_ms: int = 0
     started_at: datetime = Field(default_factory=_now)
     finished_at: datetime | None = None
+
+
+# --- Profile -------------------------------------------------------------------
+
+
+class Profile(BaseModel):
+    """Who is using this install. One row.
+
+    The timezone is the load-bearing field: "every weekday at 8am" means
+    nothing until you know whose 8am, and the first-run wizard exists mostly
+    to capture it before the first schedule is written.
+    """
+
+    profile_id: str = "me"
+    full_name: str = ""
+    email: str = ""
+    timezone: str = "UTC"
+    locale: str = "en-US"
+    onboarding_completed: bool = False
+    onboarding_version: int = 1
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)

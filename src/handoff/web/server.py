@@ -229,6 +229,7 @@ def _context(request: Request, page: str, **extra: Any) -> dict[str, Any]:
             ]
         ),
         "stats": store.stats(),
+        "profile": store.get_profile(),
         "scheduler": daemon.get_scheduler().status(),
         "voice_enabled": stt_available(),
         **extra,
@@ -365,6 +366,84 @@ def _startup() -> None:
 @app.on_event("shutdown")
 def _shutdown() -> None:
     daemon.get_scheduler().stop()
+
+
+COMMON_TIMEZONES = [
+    "Pacific/Honolulu", "America/Anchorage", "America/Los_Angeles", "America/Denver", "America/Phoenix",
+    "America/Chicago", "America/New_York", "America/Toronto", "America/Vancouver", "America/Mexico_City",
+    "America/Bogota", "America/Lima", "America/Santiago", "America/Buenos_Aires", "America/Sao_Paulo",
+    "UTC", "Europe/London", "Europe/Dublin", "Europe/Lisbon", "Europe/Paris", "Europe/Madrid",
+    "Europe/Amsterdam", "Europe/Berlin", "Europe/Zurich", "Europe/Rome", "Europe/Stockholm",
+    "Europe/Warsaw", "Europe/Athens", "Europe/Istanbul", "Europe/Moscow", "Europe/Kyiv", "Africa/Cairo",
+    "Africa/Lagos", "Africa/Nairobi", "Africa/Johannesburg", "Asia/Jerusalem", "Asia/Dubai", "Asia/Tehran",
+    "Asia/Karachi", "Asia/Kolkata", "Asia/Bangkok", "Asia/Jakarta", "Asia/Singapore", "Asia/Hong_Kong",
+    "Asia/Shanghai", "Asia/Taipei", "Asia/Seoul", "Asia/Tokyo", "Australia/Perth", "Australia/Sydney",
+    "Pacific/Auckland",
+]
+
+
+@app.middleware("http")
+async def _onboarding_gate(request: Request, call_next):
+    """First run lands on the welcome wizard; everything else waits for it.
+
+    Only page navigations are redirected — the API, static files, SSE and
+    the wizard itself pass through — so a half-set-up install is never a
+    broken one, just one that asks two questions first.
+    """
+    path = request.url.path
+    if (
+        request.method == "GET"
+        and not path.startswith(("/welcome", "/static", "/api", "/events", "/health", "/favicon"))
+        and "text/html" in request.headers.get("accept", "")
+        and not request.headers.get("HX-Request")
+    ):
+        try:
+            if not get_store().get_profile().onboarding_completed:
+                return RedirectResponse("/welcome", status_code=303)
+        except Exception:
+            pass
+    return await call_next(request)
+
+
+@app.get("/welcome", response_class=HTMLResponse)
+def welcome(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="welcome.html",
+        context=_context(request, "welcome", profile=get_store().get_profile(), timezones=COMMON_TIMEZONES),
+    )
+
+
+@app.post("/welcome")
+def welcome_save(
+    full_name: str = Form(""), email: str = Form(""), timezone: str = Form("UTC"), locale: str = Form("en-US")
+):
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+    store = get_store()
+    profile = store.get_profile()
+    profile.full_name = full_name.strip()
+    profile.email = email.strip()
+    try:
+        ZoneInfo(timezone.strip())
+        profile.timezone = timezone.strip()
+    except (ZoneInfoNotFoundError, ValueError):
+        profile.timezone = "UTC"
+    profile.locale = locale.strip() or "en-US"
+    profile.onboarding_completed = True
+    profile.updated_at = datetime.now(UTC)
+    store.save_profile(profile)
+    return RedirectResponse("/", status_code=303)
+
+
+@app.post("/welcome/skip")
+def welcome_skip():
+    store = get_store()
+    profile = store.get_profile()
+    profile.onboarding_completed = True
+    profile.updated_at = datetime.now(UTC)
+    store.save_profile(profile)
+    return RedirectResponse("/", status_code=303)
 
 
 @app.get("/")
@@ -806,7 +885,7 @@ def api_decide(interrupt_id: str, body: dict):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "settings": config.settings_summary()}
+    return {"app": "handoff", "ok": True, "settings": config.settings_summary()}
 
 
 @app.get("/favicon.ico")

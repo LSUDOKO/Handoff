@@ -271,10 +271,16 @@ class ChatService:
             list_workflows,
         ]
         tools += _ready_mcp_tools()
+        profile = get_store().get_profile()
+        about = (
+            f"\n\nAbout the person: {profile.full_name or 'unnamed'}"
+            f"{' <' + profile.email + '>' if profile.email else ''}, timezone {profile.timezone}. "
+            "Use that timezone for every schedule unless they say otherwise."
+        )
         return Agent(
             model=config.get_model(),
             tools=tools,
-            system_prompt=ASSISTANT_PROMPT,
+            system_prompt=ASSISTANT_PROMPT + about,
             agent_id=AGENT_ID,
             name="Handoff",
             description="The workspace assistant",

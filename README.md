@@ -22,6 +22,22 @@ or out loud. By the second, it has stopped asking.
 
 ![Architecture](docs/architecture.png)
 
+## What it looks like
+
+A workspace at a glance — latest runs, workflows, triggers, agents — in a
+native desktop window or the browser, light or dark.
+
+![Overview](docs/screens/overview.png)
+
+| | |
+|---|---|
+| ![Activity](docs/screens/activity.png) | ![Decision](docs/screens/decision.png) |
+| **Activity** — the few things it needs you for, answerable inline | **Decision** — the item, why it stopped, the gauge against the threshold |
+| ![Chat](docs/screens/chat.png) | ![Run inspector](docs/screens/run-inspector.png) |
+| **Chat** — a persisted Strands session that drives the workspace's tools | **Runs** — a waterfall of every model turn and tool call, with cost |
+| ![Agent workbench](docs/screens/agent-workbench.png) | ![Tool servers](docs/screens/tool-servers.png) |
+| **Agents** — run any agent on a prompt; Result · Tool calls · Trace | **Tool servers** — MCP catalogue with a live tool invoker |
+
 ---
 
 ## The one thing to look at
@@ -190,6 +206,30 @@ coincidence, not a rule. Most of the tests in
 
 ---
 
+## The platform around the gate
+
+The gate is one file. Around it is the surface a person needs before a
+workflow engine is a product — modelled on the way an agent studio is laid
+out, implemented in Python on Strands:
+
+| Surface | What it does |
+|---|---|
+| **Workspaces** | Separate learned rules, credentials and agents. Each one is a `workspace.yml` you can edit in place, download, bundle with its skills, import elsewhere — the file is the configuration. |
+| **Chat** | A Strands `Agent` per chat with a store-backed `SessionRepository`, so the thread survives restarts. It operates the workspace — runs workflows, reads runs, answers decisions — and builds new ones. Replies stream; every tool call is a card; a run that stops mid-chat surfaces its decision inline. |
+| **Activity** | Pending and recent decisions across workspaces, answered inline with a note that becomes a rule. |
+| **Runs / Inspector** | Every run as a timeline of graph nodes and a waterfall of steps, with inputs, outputs, timings, tokens and cost. |
+| **Agents** | Built-in and custom agents (prompt + allow-listed tools + skills), each runnable from a workbench with run history and a credential preflight. |
+| **Tool servers** | MCP servers as a catalogue: probe, list tools with schemas, **call one live**, see which workflows use it, add from the registry. |
+| **Skills** | Markdown with front matter, grouped by namespace, with version history, a diff view, and import from files or a zip. |
+| **Memory** | Learned rules and notes, per workspace, on local JSON or AgentCore Memory. |
+| **Schedules** | An in-process cron scheduler for the desktop; EventBridge → Lambda → AgentCore Runtime in the cloud. |
+| **Usage** | Tokens and cost per model and per run, attributed to the model that served the call. |
+| **Settings** | A primary → fallback model chain per provider, written to `.env`; the gate's threshold; the runtime's facts. |
+| **Welcome** | A first-run wizard that captures the one field cron cannot live without: your timezone. |
+
+Keyboard: `⌘K` asks the workspace, `⌘/` switches workspaces, `/` focuses
+chat. The desktop app remembers its window and reopens on the page you left.
+
 ## Two front ends, one gate
 
 | Surface | The gate's question goes to | Code |
@@ -226,6 +266,8 @@ result = run_in_host(ctx, "run the morning triage")
 | `AgentTool` subclass | [`host/tools.py`](src/handoff/host/tools.py) — host tools as Strands tools |
 | `OpenAIModel` subclass | [`providers.py`](src/handoff/providers.py) — repairs malformed tool-call JSON |
 | OpenTelemetry tracing | `config.configure_observability()` |
+| `SessionRepository` + `RepositorySessionManager` | [`chat/repository.py`](src/handoff/chat/repository.py) — chats persisted in the same store as everything else |
+| `BeforeToolCallEvent` / `AfterToolCallEvent` narration | [`chat/service.py`](src/handoff/chat/service.py) — a card per tool call, streamed |
 
 Built and verified against **`strands-agents` 1.55.1**, on a real model (Groq
 `qwen/qwen3.8-27b`): 8 items, 7 handled alone, 1 escalated, one interrupt.
@@ -246,15 +288,17 @@ payload — so pin the version before changing anything in the gate.
 | AgentCore Browser | the competitor-pricing workflow |
 | AgentCore Observability | OTEL traces → CloudWatch |
 | DynamoDB | one table, partitioned by collection — configs, runs, interrupts, sessions, usage, audit |
-| EventBridge Scheduler | cron triggers |
+| EventBridge Scheduler → Lambda | cron triggers (Scheduler cannot invoke AgentCore directly; a twelve-line function forwards the tick) |
 | SNS | "a decision is waiting" notifications |
 
 ```bash
 python infra/deploy_agentcore.py --check    # tells you exactly what's missing
-python infra/deploy_agentcore.py            # build (arm64) → ECR → AgentCore
+python infra/deploy_agentcore.py            # build (arm64) → ECR → Runtime, via boto3
 python infra/memory_setup.py                # AgentCore Memory store
-python infra/dynamodb_setup.py              # durable storage
-python infra/eventbridge_setup.py --list    # preview the schedules
+python infra/dynamodb_setup.py              # one table, partitioned by collection
+python infra/iam_setup.py                   # the role EventBridge Scheduler assumes
+python infra/lambda_setup.py --runtime-arn … # Scheduler can't target AgentCore directly
+python infra/eventbridge_setup.py --target-arn <lambda> --role-arn <role>
 ```
 
 Every store has a local JSON backend, so none of this is required to run, test
@@ -276,7 +320,7 @@ region and works fine on Nova. That is why the default is Nova Pro.
 
 ```bash
 make test
-# 138 passed
+# 168 passed
 ```
 
 The ones worth reading are in
@@ -299,20 +343,22 @@ src/handoff/
 ├── graph/nodes/            trigger, executor, classifier, gate, completer
 ├── agents/                 builder, executor runner, learner
 ├── host/                   embed Handoff in another agent runtime
-├── web/                    FastAPI + HTMX — log, builder, decision, trace
+├── chat/                   persisted chats: store-backed SessionRepository, streaming service
+├── platform/               workspaces, credentials, skills, agents, workbench, MCP, usage, workspace.yml
+├── web/                    FastAPI + HTMX + Jinja — the shell and every page; tokens.css / ui.css / pages.css
 ├── workflows/              five shipped templates
 ├── memory/store.py         AgentCore Memory + local preferences
 ├── mcp/servers.py          MCP registry
 ├── tools/voice.py          Whisper in, Orpheus out, spoken commands
 ├── providers.py            resilient OpenAI-compatible provider
 ├── events.py               live run feed (SSE)
-├── desktop.py              native window
+├── desktop.py              native window that remembers itself
 ├── doctor.py               real-call credential checks
 └── app.py                  AgentCore Runtime entrypoint
 
 docs/       ARCHITECTURE · SETUP · DEMO · SUBMISSION · diagram · plan/
 infra/      AgentCore, DynamoDB, Memory, EventBridge
-tests/      138 tests
+tests/      168 tests
 ```
 
 ---

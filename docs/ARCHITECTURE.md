@@ -298,3 +298,77 @@ that cannot ask must not decide to act anyway.
 The pattern: degrade the *quality* of the work, never the *safety* of it. Every
 fallback either does less or does it worse — none of them does something
 irreversible that the configured path wouldn't have.
+
+---
+
+## The v2 platform layer
+
+Everything above is the engine. v2 adds the studio around it, on the same
+store and the same SDK.
+
+### One store, one table
+
+Fourteen collections (workflows, runs, interrupts, audit, preferences,
+workspaces, credentials, tool servers, skills, agents, memory, schedules,
+artifacts, sessions, usage, chats, chat messages, agent runs, profile) share
+one interface with two backends. On the desktop it is JSON files under the
+state directory. Deployed it is **one DynamoDB table** with a composite key —
+`pk` is the collection name, `sk` the item id — so listing a collection is a
+`Query`, never a `Scan`, and one collection's rows can never be handed to
+another's model. The earlier three-table layout could not work: each
+collection has its own id attribute and a table has exactly one key schema.
+
+### Chats are Strands sessions
+
+A chat is a Strands `Agent` with a `RepositorySessionManager` whose
+`SessionRepository` is backed by that store
+([`chat/repository.py`](../src/handoff/chat/repository.py)). Messages are
+rows; the session id is the chat id. A conversation survives a restart and,
+deployed, lives in DynamoDB — the same durability as a run. The agent's tools
+are the workspace's levers (`run_workflow_now`, `recent_runs`,
+`pending_decisions`, `decide`, memory, artifacts) plus the Builder's, plus
+every enabled MCP server whose credentials are present.
+
+A turn runs on a worker thread and narrates itself over the in-process
+events bus: `delta` for text, `tool_start` / `tool_end` from a
+`HookProvider` on `BeforeToolCallEvent` / `AfterToolCallEvent`, `asked` when
+the turn left decisions waiting, `done` with the final text, any workflow
+config it produced, and token usage. The page paints from SSE. The same
+narrator drives the agent workbench.
+
+### The interrupt reaches the chat
+
+A workflow started from chat runs the normal graph with the normal gate.
+When it stops, the decision exists in the store like any other; the turn
+diffs pending interrupts before and after and emits `asked`, and the chat
+page fetches the same decision card Activity renders. Answering it in either
+place resumes the same run.
+
+### `workspace.yml`
+
+[`platform/workspace_yaml.py`](../src/handoff/platform/workspace_yaml.py)
+renders a workspace as a document — workflows, non-built-in skills, agents,
+tool servers; never credentials — and applies one back with *the file is the
+truth* semantics: things named are created or updated, things the workspace
+had but the file no longer lists are removed. A bundle is that file plus one
+Markdown per skill and one JSON per agent, importable anywhere, from the UI
+or `handoff workspace import`.
+
+### Cloud cron
+
+EventBridge Scheduler cannot target AgentCore Runtime. The schedule fires a
+twelve-line Lambda that forwards its payload — the same `{"type": "tick",
+"workflow_id": …}` the runtime accepts from anything else — with
+`InvokeAgentRuntime`. Two IAM roles: one the scheduler assumes (may invoke
+the function), one the function assumes (may invoke the runtime). Nothing
+else may.
+
+### The shell
+
+A token-based design system: `tokens.css` (spacing, type, `light-dark()`
+colour pairs), `reset.css`, `ui.css` (blocks with modifiers) and `pages.css`
+(what knows a workflow from a run). An inline SVG sprite for icons. The
+sidebar is data ([`web/nav.py`](../src/handoff/web/nav.py)) — global tools,
+then Discover, then workspaces with a sub-nav that unfolds under the active
+one. `app.js` owns theme, palette, toasts, hotkeys and the live status dot;
+`chat.js` owns streaming; `handoff.js` owns voice.
