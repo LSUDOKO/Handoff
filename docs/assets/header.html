@@ -1,0 +1,47 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<!-- Renders with orb.js copied beside this file: cp src/handoff/web/static/orb.js docs/assets/ ; then screenshot at 1600x640 (see scripts in the README tooling notes). -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Comfortaa:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root { --bg: oklch(0.965 0.008 85); --card: oklch(0.98 0.005 85); --ink: oklch(0.19 0 0); --muted: oklch(0.19 0 0 / 0.55); --border: oklch(0.19 0 0 / 0.1); --accent: oklch(0.19 0 0); --accent-ink: oklch(0.99 0 0); }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1600px; height: 640px; overflow: hidden; background: var(--bg); font-family: "Instrument Sans", system-ui, sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+  .wall { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(10, 1fr); gap: 14px; padding: 14px; opacity: 0.16; filter: saturate(0.6); mask-image: radial-gradient(ellipse 62% 70% at 62% 50%, black 20%, transparent 70%); -webkit-mask-image: radial-gradient(ellipse 62% 70% at 62% 50%, black 20%, transparent 70%); }
+  .wall div { background: var(--card); border: 1px solid var(--border); border-radius: 14px; height: 92px; display: flex; align-items: center; justify-content: center; font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--muted); }
+  .brand { position: absolute; left: 72px; top: 56px; display: flex; align-items: center; gap: 14px; }
+  .mark { width: 44px; height: 44px; border-radius: 13px; background: var(--accent); display: grid; place-items: center; }
+  .mark i { width: 15px; height: 15px; border-radius: 3px; background: var(--accent-ink); transform: rotate(45deg); }
+  .word { font-family: "Comfortaa", sans-serif; font-weight: 600; font-size: 34px; letter-spacing: -0.02em; }
+  .copy { position: absolute; left: 72px; top: 140px; width: 880px; }
+  h1 { font-size: 84px; font-weight: 500; letter-spacing: -0.035em; line-height: 1.02; text-wrap: balance; }
+  h1 b { font-weight: 500; color: oklch(0.45 0.16 250); }
+  p.sub { margin-top: 22px; font-size: 21px; line-height: 1.4; color: var(--muted); max-width: 44ch; }
+  .pills { position: absolute; left: 72px; bottom: 48px; display: flex; gap: 10px; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px; border-radius: 999px; font-size: 14.5px; font-weight: 600; border: 1px solid oklch(0.19 0 0 / 0.16); background: linear-gradient(-75deg, oklch(0.19 0 0 / 0.04), oklch(0.19 0 0 / 0.12), oklch(0.19 0 0 / 0.04)), oklch(0.19 0 0 / 0.06); box-shadow: inset 0 1px 2px oklch(0.19 0 0 / 0.2), inset 0 -3px 4px oklch(0 0 0 / 0.14); }
+  .pill.solid { background: var(--accent); color: var(--accent-ink); border-color: transparent; box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.3), inset 0 -2px 4px oklch(0 0 0 / 0.15), 0 8px 24px oklch(0 0 0 / 0.25); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: oklch(0.72 0.19 150); }
+  .orb-wrap { position: absolute; right: 130px; top: 46%; transform: translateY(-50%); width: 380px; height: 380px; }
+  canvas, .fallback { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; }
+  .fallback { --hue: 225; background: radial-gradient(circle at 35% 30%, oklch(0.95 0.05 var(--hue) / 0.9), transparent 38%), radial-gradient(circle at 50% 55%, oklch(0.72 0.19 var(--hue)), oklch(0.45 0.16 var(--hue)) 62%, oklch(0.3 0.1 var(--hue) / 0) 72%); box-shadow: 0 0 80px oklch(0.7 0.18 var(--hue) / 0.45); }
+  .caption { position: absolute; right: 120px; bottom: 56px; width: 400px; text-align: center; font-family: "JetBrains Mono", monospace; font-size: 13px; color: var(--muted); letter-spacing: 0.04em; }
+</style></head><body>
+<div class="wall" id="wall"></div>
+<div class="brand"><span class="mark"><i></i></span><span class="word">handoff</span></div>
+<div class="copy">
+  <h1>Describe it.<br>Hand it off.<br>It <b>runs.</b></h1>
+  <p class="sub">A voice-first agent on the Strands Agents SDK that runs your recurring chores on AWS and asks you only when it genuinely cannot decide.</p>
+</div>
+<div class="pills">
+  <span class="pill solid">Agents for Humans · Professional track</span>
+  <span class="pill"><span class="dot"></span> Strands Agents SDK</span>
+  <span class="pill">Bedrock · AgentCore · Transcribe · Polly</span>
+  <span class="pill">Apache-2.0</span>
+</div>
+<div class="orb-wrap"><canvas id="orb" width="800" height="800"></canvas><span class="fallback" id="orb-fallback" hidden></span></div>
+<div class="caption">tap · speak · it builds, runs, and asks once</div>
+<script src="orb.js"></script>
+<script>
+  const words = ["gmail","linear","slack","github","0 8 * * 1-5","confidence 0.7","trigger → executor","ask once","Strands Graph","AgentCore Runtime","Transcribe","Polly","Nova Pro","DynamoDB","EventBridge","MCP","interrupt()","workspace.yml","hands-free","learned rule"];
+  const wall = document.getElementById("wall"); for (let i = 0; i < 60; i++) { const d = document.createElement("div"); d.textContent = words[i % words.length]; wall.append(d); }
+  const orb = HandoffOrb.mount(document.getElementById("orb"), { fallbackEl: document.getElementById("orb-fallback") });
+  setTimeout(() => orb.setState("listening"), 50); setTimeout(() => orb.setLevel(0.35), 300);
+</script></body></html>

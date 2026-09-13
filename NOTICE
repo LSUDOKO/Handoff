@@ -30,8 +30,33 @@ from its own distribution and remains under its own licence.
   PyYAML                    MIT
   json-repair               MIT
   pywebview                 BSD-3-Clause  (optional: desktop window)
+  rich                      MIT           (the command line)
+  Markdown                  BSD-3-Clause  (the guides)
+  amazon-transcribe         Apache-2.0    (optional: streaming speech on AWS)
+  sounddevice               MIT           (optional: microphone from the terminal and the desktop window)
 
 Served to the browser from a CDN, not redistributed here:
 
   htmx                      BSD-2-Clause
-  Archivo, Newsreader       SIL Open Font License 1.1
+  Instrument Sans, Comfortaa, JetBrains Mono   SIL Open Font License 1.1 (Google Fonts)
+
+------------------------------------------------------------------------
+Adapted work
+------------------------------------------------------------------------
+
+Two pieces were adapted, not copied. No file from either project is in
+this repository; both are MIT licensed.
+
+  The orb's WebGL fragment shader (src/handoff/web/static/orb.js) is
+  adapted from DORA's volumetric orb, with a transparent background and
+  audio-reactive uniforms added.
+    DORA — MIT — https://github.com/Aaditya1273/DORA
+
+  The visual language of the app and the site (the oklch cream palette,
+  the glass and accent surfaces, the drift wall and the clipped footer
+  wordmark) is re-expressed from Agent.md's site against Handoff's own
+  design tokens.
+    Agent.md — MIT — https://github.com/Aaditya1273/Agent.md
+
+Terminal screenshots in docs/screens were rendered with freeze
+(charmbracelet, MIT) in Cascadia Code (Microsoft, SIL OFL 1.1).

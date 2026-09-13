@@ -114,5 +114,7 @@ asking about that — and a wake word for the orb.
 
 - **Repository:** https://github.com/LSUDOKO/Handoff (Apache-2.0)
 - **Site and docs:** https://handoff-eya.pages.dev
+- **Pitch deck:** `docs/pitch/deck.pdf` (also `.pptx`) · **Script:** `docs/pitch/script.md`
+- **Architecture:** `docs/architecture.png` (editable `docs/architecture.excalidraw`)
 - **Demo video:** `ADD BEFORE SUBMITTING`
 - **AWS Builder ID:** `ADD BEFORE SUBMITTING`
