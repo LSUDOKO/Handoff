@@ -38,6 +38,16 @@
     ));
   });
 
+  // ---- Talk from anywhere ---------------------------------------------------------
+  // Ctrl+Space (⌘+Space on a Mac keyboard reaches the OS first, so Ctrl there too)
+  // opens the orb already listening; on the orb page it just taps the orb.
+  document.addEventListener("keydown", (e) => {
+    if (e.code !== "Space" || !e.ctrlKey || e.repeat) return;
+    e.preventDefault();
+    const orb = document.getElementById("orb-button");
+    if (orb) orb.click(); else location.href = "/orb?listen=1";
+  });
+
   // ---- Toasts ------------------------------------------------------------------
   function toast(title, opts = {}) {
     let host = $(".toasts");

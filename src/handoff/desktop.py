@@ -9,26 +9,110 @@ environment you already have, which is why it works the same on all three.
 
     handoff desktop
 
-What makes it feel like an app rather than a browser tab: it remembers its
-size and position, reopens on the page you were on, and if Handoff is
-already running it opens a window onto that instance instead of a second
-scheduler. If no native webview is available it opens the system browser
-and says so — a worse window beats no window.
+What makes it feel like an app rather than a browser tab: it opens on the
+orb, remembers its size and position, reopens on the page you were on, and
+if Handoff is already running it opens a window onto that instance instead
+of a second scheduler. If no native webview is available it opens the
+system browser and says so — a worse window beats no window.
+
+The window also carries a small bridge the page can call: when the webview
+will not hand the page a microphone, the bridge records natively through
+PortAudio and hands back a WAV, so talking works in the window regardless.
 """
 
 from __future__ import annotations
 
+import base64
 import json
 import socket
 import threading
 import time
 import webbrowser
+from collections.abc import Callable
 from contextlib import closing
 from pathlib import Path
+from typing import Any
 
 from handoff import config
 
 WINDOW_STATE = "window.json"
+DEFAULT_PAGE = "/orb"
+
+
+class DesktopBridge:
+    """What the page can call as ``window.pywebview.api``.
+
+    Records 16 kHz mono Int16 from the default input through ``sounddevice``
+    between ``start_listening`` and ``stop_listening``; returns the take as a
+    base64 WAV. Errors come back as ``{"ok": False, "error": ...}`` rather
+    than exceptions, because a JS bridge swallows tracebacks.
+    """
+
+    def __init__(self, stream_factory: Callable[..., Any] | None = None) -> None:
+        self._factory = stream_factory
+        self._stream: Any = None
+        self._frames: list[bytes] = []
+        self._lock = threading.Lock()
+        self._error = ""
+
+    def _open(self, callback: Callable[..., None]) -> Any:
+        factory = self._factory
+        if factory is None:
+            import sounddevice
+
+            # The raw stream hands back bytes, so no numpy is needed.
+            factory = sounddevice.RawInputStream
+        return factory(samplerate=16000, channels=1, dtype="int16", callback=callback)
+
+    def start_listening(self) -> dict[str, Any]:
+        with self._lock:
+            if self._stream is not None:
+                return {"ok": True}
+            self._frames = []
+            self._error = ""
+
+            def on_audio(indata: Any, frames: int, time_info: Any, status: Any) -> None:
+                self._frames.append(bytes(indata))
+
+            try:
+                self._stream = self._open(on_audio)
+                self._stream.start()
+            except Exception as exc:
+                self._stream = None
+                self._error = str(exc)
+                return {"ok": False, "error": str(exc)[:200]}
+        return {"ok": True}
+
+    def stop_listening(self) -> dict[str, Any]:
+        from handoff.speech import wav
+
+        with self._lock:
+            stream, self._stream = self._stream, None
+            if stream is None:
+                return {"ok": False, "error": self._error or "not listening"}
+            try:
+                stream.stop()
+                stream.close()
+            except Exception:
+                pass
+            pcm = b"".join(self._frames)
+            self._frames = []
+        return {
+            "ok": True,
+            "wav_b64": base64.b64encode(wav.pcm_to_wav(pcm, 16000, 1)).decode("ascii"),
+            "seconds": len(pcm) / 32000,
+        }
+
+    def status(self) -> dict[str, Any]:
+        if self._factory is not None:
+            return {"mic": True, "backend": "sounddevice"}
+        try:
+            import sounddevice
+
+            sounddevice.query_devices(kind="input")
+            return {"mic": True, "backend": "sounddevice"}
+        except Exception as exc:
+            return {"mic": False, "backend": "none", "error": str(exc)[:120]}
 
 
 def _state_path() -> Path:
@@ -108,8 +192,10 @@ def main(port: int | None = None, width: int = 1360, height: int = 880) -> int:
             print(f"[handoff] server did not come up on :{actual}")
             return 1
 
-    last_page = state.get("page") or "/"
-    url = f"http://127.0.0.1:{actual}{last_page if last_page.startswith('/') else '/'}"
+    last_page = state.get("page") or DEFAULT_PAGE
+    if last_page in ("", "/"):
+        last_page = DEFAULT_PAGE
+    url = f"http://127.0.0.1:{actual}{last_page if last_page.startswith('/') else DEFAULT_PAGE}"
 
     try:
         import webview
@@ -131,7 +217,8 @@ def main(port: int | None = None, width: int = 1360, height: int = 880) -> int:
             y=state.get("y"),
             min_size=(760, 540),
             text_select=True,
-            background_color="#f5f3f1",
+            background_color="#f6f4ef",
+            js_api=DesktopBridge(),
         )
 
         def remember() -> None:
@@ -144,7 +231,7 @@ def main(port: int | None = None, width: int = 1360, height: int = 880) -> int:
                         "height": window.height,
                         "x": window.x,
                         "y": window.y,
-                        "page": path if path.startswith("/") and not path.startswith("/welcome") else "/",
+                        "page": path if path.startswith("/") and not path.startswith("/welcome") else DEFAULT_PAGE,
                     }
                 )
             except Exception:
