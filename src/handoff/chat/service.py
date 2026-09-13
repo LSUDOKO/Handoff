@@ -121,6 +121,9 @@ The config schema for activate_workflow:
 """
 
 _FENCE = re.compile(r"```json\s*\{.*?\}\s*```", re.S)
+#: "run it now", "start it", "try that", "go ahead and run" — the phrasings
+#: that mean the person expects a run to follow the set-up in this turn.
+_RUN_NOW = re.compile(r"\b(run|start|try|kick off|launch)\b[^.!?]{0,24}\b(it|now|that|this|one)\b|\brun now\b", re.I)
 _BLANKS = re.compile(r"\n{3,}")
 #: Nova narrates its reasoning inside <thinking> tags before answering. That
 #: is useful to the model and noise to the person; the inspector still has it.
@@ -339,6 +342,27 @@ class ChatService:
         ).start()
         return turn
 
+    @staticmethod
+    def _run_if_asked(channel: str, turn: int, text: str, reply: str) -> str:
+        """Start the workflow this turn activated when the person asked for a
+        run and the model stopped after activating. Spoken requests cannot
+        be followed by a click, so the run has to happen here."""
+        history = events.history(channel)
+        activated = [e for e in history if e.get("kind") == "workflow_saved" and e.get("turn") == turn]
+        started = any(e.get("kind") == "run_started" and e.get("turn") == turn for e in history)
+        if not activated or started or not _RUN_NOW.search(text):
+            return reply
+        token = voice_tools.current_channel.set(channel)
+        turn_token = voice_tools.current_turn.set(turn)
+        try:
+            outcome = voice_tools.start_run(activated[-1]["workflow_id"])
+        finally:
+            voice_tools.current_channel.reset(token)
+            voice_tools.current_turn.reset(turn_token)
+        if outcome.get("ok"):
+            return f"{reply.rstrip()} Running it now."
+        return reply
+
     def _run_turn(self, chat: Chat, turn: int, text: str) -> None:
         channel = _channel(chat.chat_id)
         store = get_store()
@@ -397,6 +421,8 @@ class ChatService:
                 voice_tools.current_turn.reset(turn_token)
             if outcome.get("ok"):
                 full = f"{_without_config(full)} I have switched on {outcome['name']}."
+        if chat.kind == "voice":
+            full = self._run_if_asked(channel, turn, text, full)
         after = [p for p in store.pending_interrupts() if p.interrupt_id not in before]
         if after:
             events.emit(
@@ -416,8 +442,11 @@ class ChatService:
                 ),
                 "usage_id",
             )
-            chat.input_tokens += usage.get("input", 0)
-            chat.output_tokens += usage.get("output", 0)
+        # Tools may have written to the chat row during the turn (what they
+        # built, what they started); merge onto the fresh row, not our copy.
+        chat = store.get_chat(chat.chat_id) or chat
+        chat.input_tokens += usage.get("input", 0)
+        chat.output_tokens += usage.get("output", 0)
         chat.preview = (_without_config(full) or chat.preview)[:120]
         chat.updated_at = datetime.now(UTC)
         store.save_chat(chat)

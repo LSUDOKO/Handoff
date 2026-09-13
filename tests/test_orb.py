@@ -201,3 +201,30 @@ class TestVoiceStream:
         c = TestClient(app)
         with c.websocket_connect("/api/voice/stream") as ws:
             assert ws.receive_json()["type"] == "unsupported"
+
+
+class TestSpokenTurn:
+    def test_a_spoken_setup_ends_active_and_running(self, monkeypatch):
+        """The whole turn on the scripted model: the builder writes a config
+        and stops; the voice guards activate it, start it because they said
+        'run it now', and the chat row remembers both."""
+        import time
+
+        from handoff import events
+        from handoff.chat import get_chat_service
+        from handoff.store import get_store
+
+        svc = get_chat_service()
+        chat = svc.voice_chat(get_store().default_workspace().workspace_id)
+        turn = svc.send(chat.chat_id, "Every weekday at 8, triage my inbox and ask me when unsure. Run it now.")
+        for _ in range(100):
+            if svc.is_busy(chat.chat_id) is None:
+                break
+            time.sleep(0.1)
+        kinds = [e["kind"] for e in events.history(f"chat:{chat.chat_id}") if e.get("turn") == turn]
+        assert "workflow_saved" in kinds and "run_started" in kinds and "done" in kinds
+        done = next(e for e in events.history(f"chat:{chat.chat_id}") if e["kind"] == "done")
+        assert "switched on" in done["text"] and "Running it now" in done["text"]
+        row = get_store().get_chat(chat.chat_id)
+        assert row.last_workflow_id and row.last_run_id
+        assert get_store().get_workflow(row.last_workflow_id).status.value == "active"
