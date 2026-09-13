@@ -20,6 +20,13 @@ That sentence becomes a workflow config, a cron trigger, and a running job. The
 first morning it asks you about the few things it couldn't call — on one screen,
 or out loud. By the second, it has stopped asking.
 
+You can say the sentence instead of typing it. **Talk** is a page with an orb:
+tap it, speak, and watch the workflow appear, the run's graph fill in, and the
+one decision it needs come back as a question you answer by voice.
+
+**Site and docs:** <https://handoff-eya.pages.dev> · **Desktop:** `handoff desktop` ·
+**Terminal:** `handoff --help`
+
 ![Architecture](docs/architecture.png)
 
 ## What it looks like
@@ -31,12 +38,12 @@ native desktop window or the browser, light or dark.
 
 | | |
 |---|---|
-| ![Activity](docs/screens/activity.png) | ![Decision](docs/screens/decision.png) |
-| **Activity** — the few things it needs you for, answerable inline | **Decision** — the item, why it stopped, the gauge against the threshold |
-| ![Chat](docs/screens/chat.png) | ![Run inspector](docs/screens/run-inspector.png) |
-| **Chat** — a persisted Strands session that drives the workspace's tools | **Runs** — a waterfall of every model turn and tool call, with cost |
-| ![Agent workbench](docs/screens/agent-workbench.png) | ![Tool servers](docs/screens/tool-servers.png) |
-| **Agents** — run any agent on a prompt; Result · Tool calls · Trace | **Tool servers** — MCP catalogue with a live tool invoker |
+| ![Talk](docs/screens/orb.png) | ![Activity](docs/screens/activity.png) |
+| **Talk** — say it, watch it build and run, answer out loud; amber means it is waiting on you | **Activity** — the few things it needs you for, answerable inline |
+| ![Decision](docs/screens/decision.png) | ![Run inspector](docs/screens/run-inspector.png) |
+| **Decision** — the item, why it stopped, the gauge against the threshold | **Runs** — a waterfall of every model turn and tool call, with cost |
+| ![Chat](docs/screens/chat.png) | ![Agent workbench](docs/screens/agent-workbench.png) |
+| **Chat** — a persisted Strands session that drives the workspace's tools | **Agents** — run any agent on a prompt; Result · Tool calls · Trace |
 
 ---
 
@@ -107,23 +114,30 @@ RUN 2 — same inbox, and now it doesn't ask
   waiting on you  0
 ```
 
-**With one free key** (Groq — real reasoning, and real voice):
+**On AWS** (Bedrock for reasoning, Transcribe and Polly for voice — one
+`aws configure`, no other keys):
 
 ```bash
-cp .env.example .env       # set HANDOFF_MODEL_PROVIDER=groq and GROQ_API_KEY
-make doctor                # every check makes a real API call
-make desktop               # native window — or `make serve` for the browser
+cp .env.example .env       # HANDOFF_MODEL_PROVIDER=bedrock, AWS_REGION=ap-northeast-2
+make doctor                # every check makes a real call — Bedrock, Speech, DynamoDB…
+make desktop               # native window, opens on the orb — or `make serve`
 ```
 
-Press **Run now**. A live feed appears under the workflow — *fetched 8
-messages… filed a ticket for… not sure about this one, setting it aside* — and
-ends with what needs you. Turn **Voice on**, open a decision, hold the mic and
-say *"archive it"*.
+Tap the orb and say *"Every weekday at eight, triage my inbox, and ask me about
+anything unsure. Run it now."* The caption fills in while you speak. Four tool
+calls later a workspace card lands — the signal, the job, the agents — then
+the run graph draws itself node by node until it stops on the one item it
+could not call. It reads that item to you. Say *"archive it"*.
 
-`HANDOFF_MODEL_PROVIDER` switches between `groq`, `anthropic` and `bedrock`. The
-agent code is identical; only the model object differs. Bedrock is what the
-AgentCore deployment uses. Full credential walkthrough:
-[`docs/SETUP.md`](docs/SETUP.md).
+**With one free key** (Groq): set `HANDOFF_MODEL_PROVIDER=groq` and
+`GROQ_API_KEY`; Whisper hears and Orpheus speaks. With neither, the browser's
+own speech engines take over and the agents run on the scripted model.
+
+`HANDOFF_MODEL_PROVIDER` switches between `bedrock`, `groq` and `anthropic`;
+`HANDOFF_SPEECH_PROVIDER` between `aws`, `groq` and `browser` (default `auto`).
+The agent code is identical; only the model object differs. Full credential
+walkthrough: [`docs/SETUP.md`](docs/SETUP.md) and the
+[guides](https://handoff-eya.pages.dev/docs).
 
 ---
 
@@ -176,12 +190,26 @@ through the same job. For something that files tickets in your name at 8am,
 
 ### Talk to it
 
-Voice is real, not a browser trick: Groq **Whisper** transcribes what you say,
-Groq **Orpheus** says things back, and the browser's own speech engines are the
-fallback so nothing goes mute over a missing key. Spoken decisions — *archive
-it, file a ticket, draft a reply, leave it* — are matched locally, with no model
-round-trip. Turn **Voice on** in the header; decisions are read to you when they
-open, and runs announce when they finish or set something aside.
+Voice is real, not a browser trick. The page streams your microphone to
+**Amazon Transcribe** over a WebSocket while you are still talking, so the
+caption fills in live and the text is ready the moment you stop; **Amazon
+Polly** says the reply. Groq's Whisper and Orpheus are the second choice, the
+browser's own engines the floor, so nothing goes mute over a missing key.
+
+The orb is a WebGL sphere whose colour and breathing follow the agent — blue
+idle, teal listening, violet thinking, green while a tool runs, and **amber only
+when it is waiting on you**. Tap it, hold `Space`, or switch on hands-free and
+it ends each utterance on silence and listens again after it answers.
+`Ctrl+Space` opens it from any page.
+
+Spoken turns run on the same Strands `Agent` as the typed chat with two extra
+tools — `activate_workflow` and `start_run` — and a prompt that speaks in
+sentences and does the whole set-up in one turn. What the turn produces is
+drawn on the page from the agent's own events: the **workspace card** when a
+workflow is saved, the **run graph** (the real `Graph`: trigger → executor →
+completer, a node per tool call, with milliseconds) when a run starts, and the
+**decision card** when it stops. Spoken decisions — *archive it, file a ticket,
+draft a reply, leave it* — are matched locally, with no model round-trip.
 
 ### Watch it work
 
@@ -203,6 +231,29 @@ question. So `find_matching_preference` requires an exact sender match, a whole
 domain, or **at least two distinct keyword hits** — one shared word is a
 coincidence, not a rule. Most of the tests in
 [`tests/test_learner.py`](tests/test_learner.py) are about rules *not* matching.
+
+### From the terminal
+
+Everything above is also a command. `handoff chat` streams the same assistant
+into your terminal (the conversation continues in the browser — one session
+repository); `handoff build "<sentence>" --activate --run` turns a sentence
+into an active workflow; `handoff run <id> --watch` follows a run's events
+live; `handoff talk --mic` is the orb without the orb. Every read-only command
+takes `--json`.
+
+```
+handoff ask · chat · build · run · runs · inspect · pending · activity · decide
+        workflows · agents · mcp · skills · memory · credentials · schedules
+        settings · usage · say · listen · talk · workspace
+        serve · desktop · share · docs · deploy · doctor · completion
+```
+
+### The site
+
+<https://handoff-eya.pages.dev> is a framework-free static site — the landing
+page with the live orb, and the guides — built by `site/build.py` from
+`docs/site/*.md` and published to Cloudflare Pages with `make site-deploy`.
+The same guides render inside the app at `/docs`.
 
 ---
 
@@ -267,10 +318,14 @@ result = run_in_host(ctx, "run the morning triage")
 | `OpenAIModel` subclass | [`providers.py`](src/handoff/providers.py) — repairs malformed tool-call JSON |
 | OpenTelemetry tracing | `config.configure_observability()` |
 | `SessionRepository` + `RepositorySessionManager` | [`chat/repository.py`](src/handoff/chat/repository.py) — chats persisted in the same store as everything else |
-| `BeforeToolCallEvent` / `AfterToolCallEvent` narration | [`chat/service.py`](src/handoff/chat/service.py) — a card per tool call, streamed |
+| `BeforeToolCallEvent` / `AfterToolCallEvent` narration | [`graph/hooks/narrator.py`](src/handoff/graph/hooks/narrator.py) — a card per tool call in chat; a node per tool call on the orb's run graph |
+| `BeforeInvocationEvent` / `AfterInvocationEvent` | the same hook, bound to every graph node, so the orb draws the `Graph` as it runs |
+| Tools that reach the page | [`chat/voice_tools.py`](src/handoff/chat/voice_tools.py) — `activate_workflow` and `start_run` emit on the chat's channel through a context variable |
 
-Built and verified against **`strands-agents` 1.55.1**, on a real model (Groq
-`qwen/qwen3.8-27b`): 8 items, 7 handled alone, 1 escalated, one interrupt.
+Built and verified against **`strands-agents` 1.55.1**, on real models (Bedrock
+Nova Lite and Pro, Groq `qwen/qwen3.8-27b`): 8 items, 7 handled alone, 1
+escalated, one interrupt — and a spoken sentence that ends as an active,
+running workflow in one turn.
 
 The interrupt API is version-sensitive — `event.interrupt(name, reason=…,
 response=…)` returns the human's answer on resume rather than taking a `data=`
@@ -283,6 +338,8 @@ payload — so pin the version before changing anything in the gate.
 | Service | Purpose |
 |---|---|
 | Amazon Bedrock (Amazon Nova / Claude Sonnet 4.5) | reasoning for all three agents |
+| Amazon Transcribe (streaming) | hears you — partial results while you speak |
+| Amazon Polly (neural) | speaks back |
 | AgentCore Runtime | serverless background execution, long-running invocations |
 | AgentCore Memory | learned preferences across runs |
 | AgentCore Browser | the competitor-pricing workflow |
@@ -304,6 +361,8 @@ python infra/eventbridge_setup.py --target-arn <lambda> --role-arn <role>
 Every store has a local JSON backend, so none of this is required to run, test
 or demo the project — only to deploy it.
 
+The site is the one thing not on AWS: static files on Cloudflare Pages.
+
 **Two things Bedrock will tell you confusingly.** Model ids are not bare: a
 current model is reached through a cross-region inference profile prefixed by
 geography (`us.`, `apac.`, `eu.`), and the prefix must match the region you
@@ -320,7 +379,7 @@ region and works fine on Nova. That is why the default is Nova Pro.
 
 ```bash
 make test
-# 168 passed
+# 255 passed
 ```
 
 The ones worth reading are in
@@ -343,22 +402,26 @@ src/handoff/
 ├── graph/nodes/            trigger, executor, classifier, gate, completer
 ├── agents/                 builder, executor runner, learner
 ├── host/                   embed Handoff in another agent runtime
-├── chat/                   persisted chats: store-backed SessionRepository, streaming service
+├── chat/                   persisted chats: store-backed SessionRepository, streaming service, voice tools
+├── speech/                 Transcribe + Polly, Whisper + Orpheus, WAV framing — one facade
+├── cli/                    every feature from the terminal, one module per command group
+├── docs.py                 the guides, rendered for the app and the site
 ├── platform/               workspaces, credentials, skills, agents, workbench, MCP, usage, workspace.yml
-├── web/                    FastAPI + HTMX + Jinja — the shell and every page; tokens.css / ui.css / pages.css
+├── web/                    FastAPI + HTMX + Jinja — the shell and every page; orb.js / talk.js / work-panel.js
 ├── workflows/              five shipped templates
 ├── memory/store.py         AgentCore Memory + local preferences
 ├── mcp/servers.py          MCP registry
-├── tools/voice.py          Whisper in, Orpheus out, spoken commands
+├── tools/voice.py          spoken commands, matched without a model
 ├── providers.py            resilient OpenAI-compatible provider
 ├── events.py               live run feed (SSE)
 ├── desktop.py              native window that remembers itself
 ├── doctor.py               real-call credential checks
 └── app.py                  AgentCore Runtime entrypoint
 
-docs/       ARCHITECTURE · SETUP · DEMO · SUBMISSION · diagram · plan/
+docs/       ARCHITECTURE · SETUP · DEMO · SUBMISSION · site/ (the guides) · plan/
+site/       the landing page and docs build, deployed to Cloudflare Pages
 infra/      AgentCore, DynamoDB, Memory, EventBridge
-tests/      168 tests
+tests/      255 tests
 ```
 
 ---

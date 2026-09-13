@@ -42,3 +42,6 @@ DORA/
 
 # Built static site (deployed with wrangler, not committed)
 site/dist/
+
+# wrangler local cache
+.wrangler/

@@ -22,7 +22,8 @@ integrations, the schedule, and, most importantly, the line between what it may
 do alone and what it must ask about. Then it runs on that schedule, handles what
 it can judge confidently, sets aside what it can't, and asks you about all of it
 on one screen. Your answer becomes a rule, so the next run asks less. You can
-answer by voice from across the room.
+do all of it out loud: tap the orb, say the sentence, watch the workflow and
+the run's graph appear, and answer the one question it has by voice.
 
 On a real model, eight messages: seven handled alone, one escalated with a
 specific reason — *"unknown vendor pitching a strategic partnership with a CEO
@@ -46,9 +47,16 @@ interruption, then done. Answer it once and the next run asks nothing.
   the same switch so a fresh clone reasons today. A resilient provider repairs
   tool-call JSON that open-weight models occasionally malform, instead of
   re-sampling.
-- **Voice.** Groq Whisper hears you; Groq Orpheus talks back; browser speech as
-  the fallback. Spoken decisions are matched locally — no model round-trip to
-  turn "archive it" into `archive`.
+- **Voice, on AWS.** The page streams the microphone to Amazon Transcribe over a
+  WebSocket while you are still talking; Amazon Polly answers. Groq's Whisper
+  and Orpheus are the second choice, browser speech the floor. Spoken turns run
+  on the same Strands `Agent` as typed chat with two extra tools that save and
+  start workflows; a hook bound to every graph node narrates the run so the
+  page draws the `Graph` filling in. Spoken decisions are matched locally — no
+  model round-trip to turn "archive it" into `archive`.
+- **Three surfaces.** A web UI, a native desktop window that opens on the orb,
+  and a CLI with every feature (`handoff chat`, `build`, `run --watch`, `talk`).
+  A static site with the guides is on Cloudflare Pages.
 - **Two surfaces.** A FastAPI + HTMX web UI with a live feed of the agent
   working (server-sent events), and a native desktop window via pywebview. It
   also embeds in another agent runtime, where the same gate answers through that
@@ -76,7 +84,7 @@ and produced one interruption per question. Finish the pass, then ask once.
 ## Accomplishments we're proud of
 
 Every Strands feature the brief names, used for its actual purpose, and a demo
-that holds up on a real model rather than a scripted one. 138 tests. The
+that holds up on a real model rather than a scripted one. 255 tests. The
 decision screen — the agent's reasoning in its own words, the confidence gauge
 with the threshold marked, and four buttons.
 
@@ -90,18 +98,21 @@ responsibility.
 
 ## What's next for Handoff
 
-AgentCore Runtime deployment with EventBridge cron and AgentCore Memory (the
-scripts are written and preflight clean; it needs a Bedrock-enabled account).
-Then the second-order rule: noticing when a *learned* rule has started handling
-things you'd have wanted to see, and asking about that.
+It is deployed: AgentCore Runtime in ap-northeast-2, EventBridge Scheduler
+through a twelve-line Lambda bridge, DynamoDB single-table state, AgentCore
+Memory for learned rules. Next is the second-order rule: noticing when a
+*learned* rule has started handling things you'd have wanted to see, and
+asking about that — and a wake word for the orb.
 
 ## Built with
 
-`strands-agents` · `amazon-bedrock` · `bedrock-agentcore` · `groq` ·
-`anthropic` · `fastapi` · `htmx` · `pywebview` · `mcp` · `whisper` · `python`
+`strands-agents` · `amazon-bedrock` · `bedrock-agentcore` · `amazon-transcribe` ·
+`amazon-polly` · `dynamodb` · `eventbridge` · `lambda` · `groq` · `anthropic` ·
+`fastapi` · `htmx` · `pywebview` · `mcp` · `webgl` · `rich` · `cloudflare-pages` · `python`
 
 ## Links
 
 - **Repository:** https://github.com/LSUDOKO/Handoff (Apache-2.0)
+- **Site and docs:** https://handoff-eya.pages.dev
 - **Demo video:** `ADD BEFORE SUBMITTING`
 - **AWS Builder ID:** `ADD BEFORE SUBMITTING`
