@@ -36,13 +36,10 @@ def fetch_unread_emails(
     if config.USE_MOCK_TOOLS:
         messages = MOCK_EMAILS[:max_results]
     else:
-        from handoff.mcp.servers import call_mcp_tool
+        from handoff.mcp.gmail_adapter import search_messages
 
-        result = call_mcp_tool(
-            "gmail", "search_threads", {"query": query, "max_results": max_results}
-        )
-        messages = list(result.get("messages", result) if isinstance(result, dict) else result)
-        messages = messages[:max_results]
+        messages, used = search_messages(query, max_results)
+        widened = used != query
 
     ctx = current_run()
     if ctx is not None:
@@ -50,7 +47,8 @@ def fetch_unread_emails(
         events.emit(
             ctx.run_id, "fetched",
             f"Fetched {len(messages)} unread message{'s' if len(messages) != 1 else ''}"
-            + (" (synthetic inbox)" if config.USE_MOCK_TOOLS else ""),
+            + (" (synthetic inbox)" if config.USE_MOCK_TOOLS else "")
+            + (f" — nothing unread, so the last three days of the inbox" if not config.USE_MOCK_TOOLS and widened else ""),
             count=len(messages),
         )
 
@@ -86,9 +84,11 @@ def get_email_body(email_id: str) -> dict:
                 }
         return {"email_id": email_id, "error": "not found"}
 
-    from handoff.mcp.servers import call_mcp_tool
+    from handoff.mcp.gmail_adapter import read_message
 
-    return call_mcp_tool("gmail", "get_message", {"id": email_id})
+    msg = read_message(email_id)
+    body = msg.get("body", "")
+    return {"email_id": email_id, "body": body[:4000], "truncated": len(body) > 4000}
 
 
 @tool

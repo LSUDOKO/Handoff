@@ -398,6 +398,12 @@ class ChatService:
             nonlocal full
             data = kw.get("data")
             if isinstance(data, str) and data:
+                # Nova closes a tool call with a literal "</tool>" in the text
+                # stream; it is model syntax, not an answer, and it was landing
+                # in the caption as the first thing the person read.
+                data = data.replace("</tool>", "")
+                if not data:
+                    return
                 full += data
                 events.emit(channel, "delta", data, turn=turn)
 

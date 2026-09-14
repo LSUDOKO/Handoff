@@ -12,6 +12,7 @@ narration sentence that quotes the numbers so the voice matches the footage.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -95,7 +96,7 @@ def main(clips_dir: str, state_dir: str, audio_dir: str) -> int:
     workflow_id = pick.get("workflow_id", "")
     workflows = json.loads((state / "workflows.json").read_text())
     wrows = workflows if isinstance(workflows, list) else list(workflows.values())
-    threshold = next((w.get("confidence_threshold") for w in wrows if w.get("workflow_id") == workflow_id and w.get("confidence_threshold")), None) or 0.7
+    threshold = next((w.get("confidence_threshold") for w in wrows if w.get("workflow_id") == workflow_id and w.get("confidence_threshold")), None) or float(os.environ.get("CONFIDENCE_THRESHOLD", "0.7"))
     decision = {
         "confidence": float(analysis.get("confidence", 0)),
         "threshold": float(threshold),

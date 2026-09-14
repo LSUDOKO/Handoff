@@ -48,7 +48,18 @@ def _execute(action: str, item_id: str, params: dict[str, Any]) -> dict[str, Any
 
     from handoff.mcp.servers import call_mcp_tool
 
-    result = call_mcp_tool(server, operation, {"id": item_id, **params})
+    if server == "gmail":
+        # The real Gmail server has its own verbs and argument names; the
+        # adapter translates and, for a draft, looks the thread up first.
+        from handoff.mcp.gmail_adapter import act
+
+        result = act(operation, item_id, params)
+    elif server == "linear" and operation == "create_issue":
+        from handoff.mcp.linear_adapter import create_issue
+
+        result = create_issue(item_id, params)
+    else:
+        result = call_mcp_tool(server, operation, {"id": item_id, **params})
     return {"status": "executed", "detail": f"{server}.{operation}", "result": result}
 
 
