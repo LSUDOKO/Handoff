@@ -88,6 +88,20 @@ PROVIDERS: dict[str, Provider] = {
         "github_pat_", "github", "integration",
         ["list_prs", "create_issue", "review_pr"],
     ),
+    "notion": Provider(
+        "notion", "Notion", CredentialKind.API_KEY, "NOTION_TOKEN",
+        "https://www.notion.so/profile/integrations",
+        "Internal integration secret. Share the pages or databases you want it to see with the integration after creating it.",
+        "ntn_", "notion", "integration",
+        ["search", "get_page", "create_page", "query_database"],
+    ),
+    "airtable": Provider(
+        "airtable", "Airtable", CredentialKind.API_KEY, "AIRTABLE_API_KEY",
+        "https://airtable.com/create/tokens/new",
+        "Personal access token scoped to schema.bases:read and data.records:read/write, added to the bases you want it to use.",
+        "pat", "airtable", "integration",
+        ["list_bases", "list_records", "create_record", "update_records"],
+    ),
 }
 
 

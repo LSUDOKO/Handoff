@@ -185,7 +185,7 @@ name at 8am, "different every time" is a bug.
 | `BeforeInvocationEvent` / `AfterInvocationEvent` / `AfterToolCallEvent` | [`graph/hooks/narrator.py`](src/handoff/graph/hooks/narrator.py) — one narrator per node; the orb draws the Graph from these |
 | `SessionRepository` + `RepositorySessionManager` | [`chat/repository.py`](src/handoff/chat/repository.py) — chats persisted in the same store as everything else; the terminal and the browser share a session |
 | Context variables into tools | [`chat/voice_tools.py`](src/handoff/chat/voice_tools.py) — `activate_workflow` and `start_run` emit on the page's channel |
-| `MCPClient` (stdio + HTTP) | [`mcp/servers.py`](src/handoff/mcp/servers.py) — Gmail, Linear, Slack, GitHub, web |
+| `MCPClient` (stdio + HTTP) | [`mcp/servers.py`](src/handoff/mcp/servers.py) — Gmail, Linear, Slack, GitHub, Notion, Airtable, web |
 | `AgentTool` subclass | [`host/tools.py`](src/handoff/host/tools.py) — a host runtime's tools as Strands tools |
 | `OpenAIModel` subclass | [`providers.py`](src/handoff/providers.py) — repairs malformed tool-call JSON |
 | OpenTelemetry tracing | `config.configure_observability()` |
@@ -370,7 +370,7 @@ make desktop                # native window, opens on the orb — or `make serve
 | `USE_MOCK_TOOLS` | `true` = the synthetic eight-message inbox; `false` = real MCP servers |
 | `USE_DYNAMODB` / `USE_AGENTCORE_MEMORY` | cloud state; `false` = local JSON |
 
-Full credential walkthrough — Gmail's own OAuth sign-in, Linear, Slack, GitHub
+Full credential walkthrough — Gmail's own OAuth sign-in, Linear, Slack, GitHub, Notion, Airtable
 — in [docs/SETUP.md](docs/SETUP.md). The CLI's `--state-dir` always means
 local storage, so a scratch run can never touch the live table.
 
@@ -416,7 +416,7 @@ The MP4s are not committed; they are uploaded with the submission.
 | | |
 |---|---|
 | Tests | 255 passing · `ruff` clean |
-| Doctor | Bedrock, Speech, DynamoDB, AgentCore Memory green; Gmail, Linear, Slack, GitHub skipped until keys exist |
+| Doctor | Bedrock, Speech, DynamoDB, AgentCore Memory green; Gmail, Linear, Slack, GitHub, Notion, Airtable skipped until keys exist |
 | Real-model check | a spoken set-up on Nova Lite ends active and running in two of two attempts; 8 items, 7 handled alone, 1 escalated |
 | Speech round trip | Polly said a sentence, Transcribe returned it word for word |
 | Spend | a spoken turn on Nova Lite costs under a tenth of a cent; Transcribe is $0.024/min, Polly $16 per million characters; a full demo take on Nova Pro is cents |

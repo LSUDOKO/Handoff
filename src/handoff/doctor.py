@@ -289,6 +289,66 @@ def check_github() -> dict[str, Any]:
         return _result("GitHub", FAIL, str(exc)[:140])
 
 
+def check_notion() -> dict[str, Any]:
+    token = os.getenv("NOTION_TOKEN", "")
+    if not token:
+        return _result(
+            "Notion",
+            WARN,
+            "no token set",
+            "notion.so/profile/integrations → New integration, then set NOTION_TOKEN",
+        )
+    try:
+        import httpx
+
+        response = httpx.get(
+            "https://api.notion.com/v1/users/me",
+            headers={"Authorization": f"Bearer {token}", "Notion-Version": "2025-09-03"},
+            timeout=15.0,
+        )
+        if response.status_code == 200:
+            bot = response.json()
+            name = bot.get("name") or bot.get("bot", {}).get("owner", {}).get("type", "bot")
+            return _result("Notion", OK, f"{name}")
+        return _result(
+            "Notion",
+            FAIL,
+            f"{response.status_code}: {response.text[:100]}",
+            "The integration secret may be revoked — create a new one",
+        )
+    except Exception as exc:
+        return _result("Notion", FAIL, str(exc)[:140])
+
+
+def check_airtable() -> dict[str, Any]:
+    token = os.getenv("AIRTABLE_API_KEY", "")
+    if not token:
+        return _result(
+            "Airtable",
+            WARN,
+            "no token set",
+            "airtable.com/create/tokens/new → scope schema.bases:read + data.records:read, then set AIRTABLE_API_KEY",
+        )
+    try:
+        import httpx
+
+        response = httpx.get(
+            "https://api.airtable.com/v0/meta/whoami",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=15.0,
+        )
+        if response.status_code == 200:
+            return _result("Airtable", OK, response.json().get("id", "authenticated"))
+        return _result(
+            "Airtable",
+            FAIL,
+            f"{response.status_code}: {response.text[:100]}",
+            "The token may be expired or missing scope",
+        )
+    except Exception as exc:
+        return _result("Airtable", FAIL, str(exc)[:140])
+
+
 # --- AWS services ----------------------------------------------------------
 
 
@@ -344,6 +404,8 @@ CHECKS = {
     "linear": check_linear,
     "slack": check_slack,
     "github": check_github,
+    "notion": check_notion,
+    "airtable": check_airtable,
     "dynamodb": check_dynamodb,
     "memory": check_agentcore_memory,
 }

@@ -104,6 +104,26 @@ MCP_SERVERS: dict[str, MCPServerSpec] = {
         url="https://api.githubcopilot.com/mcp/",
         required_env=["GITHUB_TOKEN"],
     ),
+    "notion": MCPServerSpec(
+        name="notion",
+        # Notion's own official MCP server (@notionhq/notion-mcp-server).
+        description="Search, read and write Notion pages and databases",
+        actions=["search", "get_page", "create_page", "update_page", "query_database"],
+        command="npx",
+        args=["-y", "@notionhq/notion-mcp-server"],
+        required_env=["NOTION_TOKEN"],
+    ),
+    "airtable": MCPServerSpec(
+        name="airtable",
+        # domdomegg/airtable-mcp-server — the most-adopted community server;
+        # it reads AIRTABLE_API_KEY straight from the environment, so it
+        # slots into the same launch path as every other npx stdio server.
+        description="Inspect Airtable bases and read or write records",
+        actions=["list_bases", "list_tables", "list_records", "create_record", "update_records"],
+        command="npx",
+        args=["-y", "airtable-mcp-server"],
+        required_env=["AIRTABLE_API_KEY"],
+    ),
     "web": MCPServerSpec(
         name="web",
         # The reference MCP fetch server, run in-process from this Python
