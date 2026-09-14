@@ -143,7 +143,7 @@ def main(audio_dir: str, out_dir: str, base: str = "http://127.0.0.1:8765", only
             result["setup"] = record(
             p, base, audio / spec["user_setup"]["wav"], spec["user_setup"]["seconds"], out, "clip-setup",
             done_when=lambda m: m["run_status"] in ("NEEDS YOU", "DONE", "FAILED") and m["state"] not in ("thinking", "acting"),
-            max_wait=240, settle=4.0,
+            max_wait=360, settle=4.0,
         )
         # 2. Answer it out loud — "cold outreach" only if the vendor pitch is what it asked about.
         if "decide" in wanted:
@@ -176,7 +176,7 @@ def main(audio_dir: str, out_dir: str, base: str = "http://127.0.0.1:8765", only
           result["again"] = record(
             p, base, audio / spec["user_again"]["wav"], spec["user_again"]["seconds"], out, "clip-again",
             done_when=lambda m: m["new_graph"] and m["run_status"] in ("DONE", "NEEDS YOU", "FAILED") and m["state"] not in ("thinking", "acting"),
-            max_wait=240, settle=4.0,
+            max_wait=360, settle=4.0,
         )
     (out / "clips.json").write_text(json.dumps(result, indent=1))
     return 0

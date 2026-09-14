@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://handoff-eya.pages.dev"><img alt="Site" src="https://img.shields.io/badge/site-handoff--eya.pages.dev-1e1e1e?style=flat-square"></a>
   <a href="https://handoff-eya.pages.dev/docs"><img alt="Docs" src="https://img.shields.io/badge/docs-8%20guides-1e1e1e?style=flat-square"></a>
-  <img alt="Tests" src="https://img.shields.io/badge/tests-255%20passing-2f855a?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-266%20passing-2f855a?style=flat-square">
   <img alt="Strands" src="https://img.shields.io/badge/Strands%20Agents%20SDK-1.55-1e1e1e?style=flat-square">
   <img alt="AWS" src="https://img.shields.io/badge/AWS-Bedrock%20%C2%B7%20AgentCore%20%C2%B7%20Transcribe%20%C2%B7%20Polly-ff9900?style=flat-square&logoColor=white">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-1e1e1e?style=flat-square"></a>
@@ -65,8 +65,8 @@ anything unsure. Set it up and run it now."*
 | ![Decision](docs/screens/decision.png) | ![Terminal](docs/screens/terminal/run-watch.png) |
 | **3 · One question.** Why it stopped, in the agent's words; how sure it was; four buttons — or say *"archive it"*. | **4 · Or from the terminal.** `handoff run --watch` streams the same events; every command takes `--json`. |
 
-Every screenshot in this README was taken from the running product on
-2026‑09‑13 — the web UI through Playwright, the terminal through
+Every screenshot in this README was taken from the running product between
+13 and 15 September 2026 — the web UI through Playwright, the terminal through
 [freeze](https://github.com/charmbracelet/freeze), the AWS console state
 through the AWS CLI. Nothing is mocked up.
 
