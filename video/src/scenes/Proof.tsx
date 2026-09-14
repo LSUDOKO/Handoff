@@ -165,3 +165,27 @@ export const Surfaces = ({ scene }: { scene: Scene }) => {
     </AbsoluteFill>
   );
 };
+
+
+/** The credentials page, captured from the running product: six integrations
+ *  on real tokens, Gmail on its own OAuth. Nothing in the footage was mocked. */
+export const Connected = ({ scene }: { scene: Scene }) => {
+  const pills = ["Gmail · OAuth", "Linear", "GitHub", "Slack", "Notion", "Airtable"];
+  return (
+    <AbsoluteFill style={{ background: T.cream, fontFamily: T.sans, color: T.ink, padding: "70px 90px" }}>
+      <Rise at={4}><Label>Settings → Credentials · captured from the running product</Label></Rise>
+      <Rise at={8} dy={40} style={{ marginTop: 22 }}>
+        <Shot src={staticFile("screens/ui/credentials.png")} width={1740} radius={16} style={{ height: 760, objectFit: "cover", objectPosition: "top" }} />
+      </Rise>
+      <div style={{ position: "absolute", left: 90, bottom: 58, display: "flex", gap: 14 }}>
+        {pills.map((t, i) => (
+          <Rise key={t} at={at(scene, 1) + i * 5} dy={18}>
+            <div style={{ padding: "12px 22px", borderRadius: 999, background: "#1E1E1E", color: "#fff", fontFamily: T.mono, fontSize: 22, letterSpacing: "0.03em", display: "flex", alignItems: "center", gap: 12, boxShadow: "0 8px 30px rgba(0,0,0,0.18)" }}>
+              <span style={{ width: 10, height: 10, borderRadius: 99, background: "#34D399", boxShadow: "0 0 0 4px rgba(52,211,153,0.25)" }} />{t}
+            </div>
+          </Rise>
+        ))}
+      </div>
+    </AbsoluteFill>
+  );
+};

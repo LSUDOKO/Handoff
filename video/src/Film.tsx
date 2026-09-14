@@ -3,7 +3,7 @@ import { buildTimeline, CUES, type Scene } from "./timeline";
 import { Captions } from "./Captions";
 import { Live } from "./scenes/Live";
 import { Open, Problem, Brief, Close } from "./scenes/Text";
-import { DecisionStill, RuleCard, Gate, Architecture, Strands, Aws, Surfaces } from "./scenes/Proof";
+import { DecisionStill, RuleCard, Gate, Architecture, Strands, Aws, Surfaces, Connected } from "./scenes/Proof";
 import { f } from "./timeline";
 
 const DARK = new Set(["problem", "gate", "strands"]);
@@ -33,6 +33,7 @@ const SceneFor = ({ scene }: { scene: Scene }) => {
     case "architecture": return <Architecture scene={scene} />;
     case "strands": return <Strands scene={scene} />;
     case "aws": return <Aws scene={scene} />;
+    case "connected": return <Connected scene={scene} />;
     case "surfaces": return <Surfaces scene={scene} />;
     case "close": return <Close scene={scene} />;
     default: return null;

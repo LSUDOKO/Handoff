@@ -79,7 +79,7 @@
       "id": "strands",
       "sentences": [
         "Every Strands feature the brief names is doing a real job.",
-        "Graph and GraphBuilder. The interrupt hook. Invocation hooks for the narrator that draws the graph. A session repository, so the terminal and the browser share one conversation. MCP clients for Gmail, Linear, Slack and GitHub."
+        "Graph and GraphBuilder. The interrupt hook. Invocation hooks for the narrator that draws the graph. A session repository, so the terminal and the browser share one conversation. MCP clients for Gmail, Linear, Slack, GitHub, Notion and Airtable."
       ]
     },
     {
@@ -87,7 +87,14 @@
       "sentences": [
         "It is deployed.",
         "AgentCore Runtime runs the graph as an arm sixty-four container. AgentCore Memory holds the rules. EventBridge fires the schedule through a twelve-line Lambda.",
-        "And handoff doctor proves every credential with a real call."
+        "And handoff doctor proves every credential with a real call. Eleven of them, Gmail to Airtable, all green."
+      ]
+    },
+    {
+      "id": "connected",
+      "sentences": [
+        "Nothing here is a mock.",
+        "Gmail signed in through its own OAuth. Linear, GitHub, Slack, Notion and Airtable on real tokens. The footage you just watched read a real inbox and filed real tickets."
       ]
     },
     {
