@@ -119,3 +119,28 @@ class TestWorkbenchPreflight:
         agent = CustomAgent(name="t", tools=["fetch_unread_emails", "notify_user", "read_audit_log"])
         needed = {row["provider"] for row in workbench.preflight(agent)}
         assert needed == {"gmail", "slack"}
+
+
+class TestSessionMessageBounds:
+    """The session repository is handed its slice bounds by Strands.
+
+    ``offset`` is ``conversation_manager.removed_message_count``, which
+    round-trips through stored JSON — so a chat restored from disk hands back
+    the *string* "0". Slicing by a str raises inside ``Agent.__init__`` and
+    kills the agent before it answers, so both bounds are coerced.
+    """
+
+    @staticmethod
+    def _repo():
+        from handoff.chat.repository import StoreSessionRepository
+
+        return StoreSessionRepository()
+
+    def test_a_string_offset_does_not_raise(self):
+        assert self._repo().list_messages("missing_chat", "a", offset="0") == []
+
+    def test_a_string_limit_does_not_raise(self):
+        assert self._repo().list_messages("missing_chat", "a", limit="5") == []
+
+    def test_a_none_offset_does_not_raise(self):
+        assert self._repo().list_messages("missing_chat", "a", offset=None) == []

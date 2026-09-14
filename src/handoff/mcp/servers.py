@@ -224,6 +224,7 @@ def load_agent_tools(servers: list[str]) -> list[Any]:
     user has actually connected, and say so.
     """
     tools: list[Any] = []
+    seen: dict[str, str] = {}
     for name in servers:
         spec = MCP_SERVERS.get(name)
         if spec is None or spec.transport == "builtin" or not spec.configured:
@@ -233,7 +234,23 @@ def load_agent_tools(servers: list[str]) -> list[Any]:
         if config.USE_MOCK_TOOLS and spec.required_env:
             continue
         try:
-            tools.extend(get_client(name).list_tools_sync())
+            for tool in get_client(name).list_tools_sync():
+                # Two servers can publish the same tool name — Linear and
+                # GitHub both expose `list_issues`. Strands refuses to
+                # register a duplicate, and the exception kills the whole
+                # agent, so the second server would take the run down with
+                # it. First one named wins, which keeps the order the
+                # workflow asked for meaningful.
+                tool_name = getattr(tool, "tool_name", None)
+                if tool_name and tool_name in seen:
+                    print(
+                        f"[handoff] '{tool_name}' from '{name}' shadowed by "
+                        f"'{seen[tool_name]}' — using the first one."
+                    )
+                    continue
+                if tool_name:
+                    seen[tool_name] = name
+                tools.append(tool)
         except Exception as exc:
             print(f"[handoff] MCP server '{name}' unavailable: {exc}")
     return tools

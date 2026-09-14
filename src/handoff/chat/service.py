@@ -149,15 +149,27 @@ def _ready_mcp_tools() -> list[Any]:
     A server that needs a key that isn't set is left out rather than offered
     and failed — the assistant should say "connect Linear" not "Linear errored".
     """
-    import os
+    from handoff.mcp.servers import MCP_SERVERS, load_agent_tools
 
-    from handoff.mcp.servers import load_agent_tools
+    # Readiness comes from the canonical spec, not from the stored row: not
+    # every server is credentialed by an environment variable. Gmail signs in
+    # through its own OAuth flow and is ready when the token file exists, so
+    # judging it by env vars alone hid a fully connected inbox behind
+    # "Gmail is not configured". Fall back to the row only for a server the
+    # spec does not know about.
+    names = []
+    for s in get_store().mcp_servers.all():
+        if not s.enabled:
+            continue
+        spec = MCP_SERVERS.get(s.name)
+        if spec is not None:
+            if spec.configured:
+                names.append(s.name)
+            continue
+        import os
 
-    names = [
-        s.name
-        for s in get_store().mcp_servers.all()
-        if s.enabled and all(os.environ.get(k) for k in (s.required_env or []))
-    ]
+        if all(os.environ.get(k) for k in (s.required_env or [])):
+            names.append(s.name)
     if not names:
         return []
     try:

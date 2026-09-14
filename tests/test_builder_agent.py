@@ -107,9 +107,25 @@ class TestValidation:
         assert result["valid"]
         assert any("No human gate" in w for w in result["warnings"])
 
-    def test_warns_about_unconfigured_integrations(self):
+    def test_warns_about_unconfigured_integrations(self, monkeypatch):
+        # Pin the integration's state instead of reading the developer's own
+        # machine: this used to assert that "gmail" warns, which quietly
+        # depended on Gmail never being connected and started failing the
+        # moment someone actually signed in.
+        from handoff.mcp import servers
+
+        spec = servers.MCP_SERVERS["gmail"]
+        monkeypatch.setattr(type(spec), "configured", property(lambda self: False))
         result = validate_workflow(json.dumps(self._valid()))
         assert any("not configured" in w for w in result["warnings"])
+
+    def test_no_warning_once_the_integration_is_connected(self, monkeypatch):
+        from handoff.mcp import servers
+
+        spec = servers.MCP_SERVERS["gmail"]
+        monkeypatch.setattr(type(spec), "configured", property(lambda self: True))
+        result = validate_workflow(json.dumps(self._valid()))
+        assert not any("not configured" in w for w in result["warnings"])
 
 
 class TestPreview:

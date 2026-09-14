@@ -111,9 +111,26 @@ class StoreSessionRepository(SessionRepository):
         offset: int = 0,
         **kwargs: Any,
     ) -> list[SessionMessage]:
-        rows = get_store().list_chat_messages(session_id, agent_id)[offset:]
-        if limit is not None:
-            rows = rows[:limit]
+        # Both bounds are annotated ``int``, but they do not always arrive as
+        # one. Strands passes ``conversation_manager.removed_message_count``
+        # for the offset, and that value round-trips through the stored
+        # conversation-manager state as JSON — so on a chat restored from disk
+        # it comes back as the string "0". Slicing by a str raises TypeError
+        # inside Agent.__init__, which kills the agent before it answers a
+        # single word. Coerce both, and treat anything unusable as no bound.
+        def _bound(value: Any) -> int | None:
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return None
+
+        rows = get_store().list_chat_messages(session_id, agent_id)
+        start = _bound(offset)
+        if start:
+            rows = rows[start:]
+        end = _bound(limit)
+        if end is not None:
+            rows = rows[:end]
         return [self._to_session_message(r) for r in rows]
 
     # -- multi-agent (unused; chats are single agents) -----------------------
