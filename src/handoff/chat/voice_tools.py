@@ -69,8 +69,10 @@ def activate_workflow(config_json: str) -> dict:
     from handoff.models import WorkflowConfig, WorkflowStatus
     from handoff.tools.mcp_discovery import validate_config_dict
 
+    from handoff.tools.workflow_store import _loads_config
+
     try:
-        parsed = json.loads(config_json)
+        parsed = _loads_config(config_json)
     except json.JSONDecodeError as exc:
         return {"ok": False, "error": f"That config is not valid JSON: {exc}"}
     if not isinstance(parsed, dict) or not parsed.get("workflow_id") or not parsed.get("name"):

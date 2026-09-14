@@ -97,6 +97,27 @@ def validate_config_dict(config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+
+def _loads_config(config_json):
+    """Parse a config the model produced. Nova drops a closing brace one time
+    in ten; json_repair puts it back rather than sending the model into a
+    retry loop over the same string."""
+    import json as _json
+    if isinstance(config_json, dict):
+        return config_json
+    text = (config_json or "").strip()
+    if text.startswith("```"):
+        text = text.strip("`").split("\n", 1)[-1].rsplit("```", 1)[0]
+    try:
+        return _json.loads(text)
+    except _json.JSONDecodeError:
+        import json_repair
+        repaired = json_repair.loads(text)
+        if isinstance(repaired, dict) and repaired:
+            return repaired
+        raise
+
+
 @tool
 def validate_workflow(config_json: str) -> dict:
     """Check a workflow config before showing it to the user.
@@ -109,7 +130,7 @@ def validate_workflow(config_json: str) -> dict:
         `warnings`, and the normalised `config` when it validates.
     """
     try:
-        config = json.loads(config_json)
+        config = _loads_config(config_json)
     except json.JSONDecodeError as exc:
         return {"valid": False, "errors": [f"Invalid JSON: {exc}"], "warnings": [], "config": None}
 
@@ -190,7 +211,7 @@ def preview_workflow(config_json: str) -> str:
         what it will ask about.
     """
     try:
-        config = json.loads(config_json)
+        config = _loads_config(config_json)
     except json.JSONDecodeError as exc:
         return f"Could not read that config: {exc}"
     return render_preview(config)

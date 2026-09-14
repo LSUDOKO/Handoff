@@ -15,6 +15,27 @@ from handoff.store import get_store
 from handoff.tools.mcp_discovery import validate_config_dict
 
 
+
+def _loads_config(config_json):
+    """Parse a config the model produced. Nova drops a closing brace one time
+    in ten; json_repair puts it back rather than sending the model into a
+    retry loop over the same string."""
+    import json as _json
+    if isinstance(config_json, dict):
+        return config_json
+    text = (config_json or "").strip()
+    if text.startswith("```"):
+        text = text.strip("`").split("\n", 1)[-1].rsplit("```", 1)[0]
+    try:
+        return _json.loads(text)
+    except _json.JSONDecodeError:
+        import json_repair
+        repaired = json_repair.loads(text)
+        if isinstance(repaired, dict) and repaired:
+            return repaired
+        raise
+
+
 @tool
 def save_workflow(config_json: str, activate: bool = False) -> dict:
     """Save a validated workflow so it can be run and scheduled.
@@ -29,7 +50,7 @@ def save_workflow(config_json: str, activate: bool = False) -> dict:
     Returns:
         Whether the save succeeded, the workflow id, and any validation errors.
     """
-    result = validate_config_dict(json.loads(config_json)) if config_json.strip() else {
+    result = validate_config_dict(_loads_config(config_json)) if str(config_json).strip() else {
         "valid": False,
         "errors": ["Empty config"],
     }
