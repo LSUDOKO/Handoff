@@ -93,9 +93,9 @@
      "seconds": 4.44
     },
     {
-     "text": "Memory checks for rules. Gmail reads the inbox. The executor judges every message, acts on the clear ones, and sets the unsure one aside.",
+     "text": "Memory checks for rules. Gmail reads the inbox. The executor judges every message, acts on the clear ones, and sets one aside.",
      "file": "n-run-2.mp3",
-     "seconds": 8.448
+     "seconds": 7.992
     },
     {
      "text": "It did not freeze the inbox on the hard one. It finished the pass, and asked once.",
@@ -103,7 +103,7 @@
      "seconds": 4.824
     }
    ],
-   "seconds": 20.28
+   "seconds": 19.824
   },
   {
    "id": "decision",
@@ -114,9 +114,9 @@
      "seconds": 2.184
     },
     {
-     "text": "Here is why it stopped, in the agent's own words: unknown vendor, strategic partnership, CEO intro call. I cannot tell if this is a real lead or phishing.",
+     "text": "Here is why it stopped, in the agent's own words: The sender is unknown and the content suggests a potential partnership, which requires human review.",
      "file": "n-decision-1.mp3",
-     "seconds": 9.6
+     "seconds": 7.944
     },
     {
      "text": "Sixty percent sure. It needs seventy to act alone. That gap is the product.",
@@ -129,7 +129,7 @@
      "seconds": 7.824
     }
    ],
-   "seconds": 24.48
+   "seconds": 22.824
   },
   {
    "id": "quieter",
@@ -140,9 +140,9 @@
      "seconds": 6.336
     },
     {
-     "text": "Same inbox, next run: handled alone, one from the rule, zero questions.",
+     "text": "Same inbox, next run: handled alone, the rest from rules, zero questions.",
      "file": "n-quieter-1.mp3",
-     "seconds": 5.4
+     "seconds": 5.352
     },
     {
      "text": "It gets quieter the longer you use it.",
@@ -150,7 +150,7 @@
      "seconds": 2.064
     }
    ],
-   "seconds": 13.8
+   "seconds": 13.752
   },
   {
    "id": "gate",
@@ -273,6 +273,11 @@
   "text": "Archive it. It's cold outreach.",
   "wav": "user-decide.wav",
   "seconds": 2.832
+ },
+ "user_decide_generic": {
+  "text": "Archive it.",
+  "wav": "user-decide_generic.wav",
+  "seconds": 1.2
  },
  "user_again": {
   "text": "Run it again.",

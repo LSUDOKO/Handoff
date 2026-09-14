@@ -15,6 +15,11 @@ style: |
   pre code { background: transparent; color: inherit; padding: 0; font-size: inherit; }
   section.dark { background: oklch(0.16 0.006 85); color: oklch(0.93 0.005 85); }
   section.dark h1, section.dark h2 { color: oklch(0.9 0.035 70); }
+  section.dark table, section.dark table thead, section.dark table tbody, section.dark table tr { background: transparent !important; }
+  section.dark table th, section.dark table td, section.dark table tbody tr:nth-child(even) td, section.dark table tbody tr:nth-child(odd) td { background: rgba(236,234,229,0.06) !important; color: oklch(0.93 0.005 85) !important; border: 1px solid rgba(236,234,229,0.16) !important; }
+  section.dark table thead th { background: rgba(236,234,229,0.14) !important; font-weight: 600; }
+  section.dark code { background: rgba(236,234,229,0.14) !important; color: oklch(0.9 0.035 70) !important; }
+  section.dark li, section.dark p { color: oklch(0.93 0.005 85); }
   section.title { display: flex; flex-direction: column; justify-content: center; }
   .wordmark { font-family: "Comfortaa", sans-serif; font-weight: 600; font-size: 30px; letter-spacing: -0.02em; }
   .muted { color: oklch(0.19 0 0 / 0.55); }

@@ -38,7 +38,7 @@
       "sentences": [
         "And this is it running, on Amazon Bedrock.",
         "That graph is the Strands Graph itself, drawn live from its own hook events.",
-        "Memory checks for rules. Gmail reads the inbox. The executor judges every message, acts on the clear ones, and sets the unsure one aside.",
+        "Memory checks for rules. Gmail reads the inbox. The executor judges every message, acts on the clear ones, and sets one aside.",
         "It did not freeze the inbox on the hard one. It finished the pass, and asked once."
       ]
     },
@@ -46,7 +46,7 @@
       "id": "decision",
       "sentences": [
         "One screen, one decision.",
-        "Here is why it stopped, in the agent's own words: unknown vendor, strategic partnership, CEO intro call. I cannot tell if this is a real lead or phishing.",
+        "Here is why it stopped, in the agent's own words: The sender is unknown and the content suggests a potential partnership, which requires human review.",
         "Sixty percent sure. It needs seventy to act alone. That gap is the product.",
         "I say: archive it, it is cold outreach. Matched locally, no model round trip, and the run resumes exactly where it stopped."
       ]
@@ -55,7 +55,7 @@
       "id": "quieter",
       "sentences": [
         "My answer became a rule. Not a vague one: exact sender, whole domain, or two distinct keywords.",
-        "Same inbox, next run: handled alone, one from the rule, zero questions.",
+        "Same inbox, next run: handled alone, the rest from rules, zero questions.",
         "It gets quieter the longer you use it."
       ]
     },

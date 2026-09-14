@@ -4,14 +4,14 @@
   "segments": [
    {
     "kind": "play",
-    "from": 7.739999999999999,
-    "to": 22.42,
+    "from": 10.14,
+    "to": 24.78,
     "rate": 1.0
    },
    {
     "kind": "play",
-    "from": 30.04,
-    "to": 39.0,
+    "from": 32.76,
+    "to": 40.26,
     "rate": 1.0
    }
   ]
@@ -21,9 +21,9 @@
   "segments": [
    {
     "kind": "play",
-    "from": 39.0,
-    "to": 53.733333,
-    "rate": 1.0
+    "from": 40.26,
+    "to": 75.866667,
+    "rate": 1.62
    }
   ]
  },
@@ -32,9 +32,9 @@
   "segments": [
    {
     "kind": "play",
-    "from": 11.15,
-    "to": 20.233333,
-    "rate": 1.0
+    "from": 13.15,
+    "to": 24.666667,
+    "rate": 1.02
    }
   ]
  },
@@ -43,25 +43,25 @@
   "segments": [
    {
     "kind": "play",
-    "from": 11.24,
-    "to": 251.733333,
-    "rate": 2.0
+    "from": 11.45,
+    "to": 29.366667,
+    "rate": 1.53
    }
   ],
-  "graphAt": null
+  "graphAt": 16.75
  },
  "decision": {
   "confidence": 0.6,
   "threshold": 0.7,
-  "reasoning": "The sender is unknown, and the content is not clear. This requires human judgement.",
+  "reasoning": "The sender is unknown and the content suggests a potential partnership, which requires human review.",
   "subject": "Strategic partnership opportunity \u2014 time sensitive",
   "sender": "partnerships@vendor.com",
   "stillSeconds": 15.0
  },
  "rule": {
-  "pattern": "Archive emails from the CFO office.",
+  "pattern": "Archive partnership opportunities from vendor.com",
   "action": "archive",
-  "match": "cfo@company.com",
+  "match": "@vendor.com",
   "holdSeconds": 3.5
  },
  "gate": {
@@ -114,21 +114,21 @@
  },
  "timeline": {
   "setup": {
-   "listen_start": 8.94,
-   "listen_stop": 21.62,
-   "first_tool": 31.04,
-   "card": 37.4,
-   "graph": 39.12,
-   "needs": 54.56
+   "listen_start": 11.34,
+   "listen_stop": 23.98,
+   "first_tool": 33.76,
+   "card": 38.66,
+   "graph": 39.59,
+   "needs": 78.02
   },
   "decide": {
-   "listen_start": 12.15,
-   "decided": 19.79
+   "listen_start": 14.15,
+   "decided": 24.98
   },
   "again": {
-   "listen_start": 12.24,
-   "graph": null,
-   "done": null
+   "listen_start": 12.45,
+   "graph": 16.75,
+   "done": 30.09
   }
  }
 }
