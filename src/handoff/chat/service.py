@@ -90,9 +90,11 @@ You do two kinds of work.
    when it will next run.
 
 You must not end a turn in which they asked you to set something up without
-having called activate_workflow. Ask a question only when the schedule or
-the destination is genuinely unclear; otherwise choose a sensible default
-and say what you chose.
+having called activate_workflow. When they ask to run something — "run it",
+"run it again", "try it" — call start_run at once; an integration that is not
+configured yet is never a reason to decline, the run uses whatever is
+connected. Ask a question only when the schedule or the destination is
+genuinely unclear; otherwise choose a sensible default and say what you chose.
 
 The config schema for activate_workflow:
 
@@ -128,11 +130,13 @@ _BLANKS = re.compile(r"\n{3,}")
 #: Nova narrates its reasoning inside <thinking> tags before answering. That
 #: is useful to the model and noise to the person; the inspector still has it.
 _THINKING = re.compile(r"<thinking>.*?</thinking>\s*", re.S | re.I)
+#: A spoken reply cannot carry a link; keep the words, drop the address.
+_MD_LINK = re.compile(r"\[([^\]]+)\]\([^)]+\)")
 
 
 def _without_config(text: str) -> str:
-    """The reply minus its fenced config (shown as a card) and thinking tags."""
-    return _BLANKS.sub("\n\n", _FENCE.sub("", _THINKING.sub("", text))).strip()
+    """The reply minus its fenced config (shown as a card), thinking tags and link syntax."""
+    return _BLANKS.sub("\n\n", _MD_LINK.sub(r"\1", _FENCE.sub("", _THINKING.sub("", text)))).strip()
 
 
 def _channel(chat_id: str) -> str:
@@ -296,7 +300,7 @@ class ChatService:
         if kind == "voice":
             # Spoken turns save and start things themselves; the typed chat
             # leaves saving to a button, so it keeps save_workflow instead.
-            tools = [t for t in tools if getattr(t, "tool_name", "") != "save_workflow"]
+            tools = [t for t in tools if getattr(t, "tool_name", "") not in ("save_workflow", "run_workflow_now")]
             tools += [voice_tools.activate_workflow, voice_tools.start_run]
         tools += _ready_mcp_tools()
         profile = get_store().get_profile()
@@ -350,12 +354,18 @@ class ChatService:
         history = events.history(channel)
         activated = [e for e in history if e.get("kind") == "workflow_saved" and e.get("turn") == turn]
         started = any(e.get("kind") == "run_started" and e.get("turn") == turn for e in history)
-        if not activated or started or not _RUN_NOW.search(text):
+        if started or not _RUN_NOW.search(text):
+            return reply
+        workflow_id = activated[-1]["workflow_id"] if activated else ""
+        if not workflow_id and channel.startswith("chat:"):
+            row = get_store().get_chat(channel.split(":", 1)[1])
+            workflow_id = row.last_workflow_id if row else ""
+        if not workflow_id:
             return reply
         token = voice_tools.current_channel.set(channel)
         turn_token = voice_tools.current_turn.set(turn)
         try:
-            outcome = voice_tools.start_run(activated[-1]["workflow_id"])
+            outcome = voice_tools.start_run(workflow_id)
         finally:
             voice_tools.current_channel.reset(token)
             voice_tools.current_turn.reset(turn_token)

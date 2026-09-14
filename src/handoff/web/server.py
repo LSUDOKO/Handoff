@@ -133,6 +133,9 @@ ACTION_PHRASE = {
     "reply": "drafting a reply",
     "post_to_slack": "posting it to Slack",
     "skip": "leaving it alone",
+    "force_interrupt": "of this one",
+    "interrupt": "of this one",
+    "ask": "of this one",
     "": "what to do",
 }
 
@@ -843,6 +846,40 @@ def docs_page(request: Request, slug: str):
 
 # --- the orb ---------------------------------------------------------------------
 
+_speech_warmed = False
+
+
+def _warm_speech() -> None:
+    """Open and close one Transcribe stream so the first tap does not pay for
+    the first connection. Runs once per process, off the request thread."""
+    global _speech_warmed
+    if _speech_warmed:
+        return
+    _speech_warmed = True
+
+    def target() -> None:
+        try:
+            from handoff import speech
+            from handoff.speech import aws
+
+            if speech.provider() != "aws":
+                return
+
+            async def once() -> None:
+                session = await aws.LiveTranscription.open(rate=16000, language=config.TRANSCRIBE_LANGUAGE)
+                await session.send(b"\x00" * 3200)
+                await session.end()
+                async for _ in session.results():
+                    pass
+                await session.close()
+
+            asyncio.run(once())
+        except Exception as exc:  # a warm-up that fails just means the first tap is slower
+            print(f"[handoff] speech warm-up skipped: {str(exc)[:80]}")
+
+    threading.Thread(target=target, name="speech-warmup", daemon=True).start()
+
+
 
 def _signal_name(workflow) -> str:
     """A short name for the trigger, the way a person would refer to it."""
@@ -894,6 +931,7 @@ def orb_page(request: Request):
     from handoff import speech
     from handoff.chat import get_chat_service
 
+    _warm_speech()
     svc = get_chat_service()
     workspace = _workspace()
     chat = svc.voice_chat(workspace.workspace_id)
@@ -914,7 +952,7 @@ def orb_page(request: Request):
             blocks=svc.history(chat.chat_id)[-12:],
             live_turn=svc.is_busy(chat.chat_id),
             speech=speech.status(),
-            pending=[_decision_context(request, p) for p in store.pending_interrupts()][:3],
+            pending=[_decision_context(request, p) for p in sorted(store.pending_interrupts(), key=lambda p: p.agent_analysis.confidence)][:3],
             last_card=({"source": "voice", **_work_card_context(last_workflow)} if last_workflow else None),
             last_run=last_run if run_live else None,
         ),
@@ -975,10 +1013,13 @@ def orb_card(request: Request, workflow_id: str, source: str = "voice"):
 @app.post("/api/voice/transcribe")
 async def voice_transcribe(audio: Annotated[UploadFile, File()]):
     """Speech → text. The browser records 16 kHz WAV; Transcribe or Whisper hears it."""
+    from starlette.concurrency import run_in_threadpool
+
     data = await audio.read()
     if not data:
         raise HTTPException(400, "empty recording")
-    result = transcribe(data, filename=audio.filename or "speech.wav")
+    # The AWS path drives its own event loop, so it runs on a worker thread.
+    result = await run_in_threadpool(transcribe, data, audio.filename or "speech.wav")
     if result.get("error"):
         raise HTTPException(502, result["error"])
     return JSONResponse(result)

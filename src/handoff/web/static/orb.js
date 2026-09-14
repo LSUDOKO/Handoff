@@ -17,13 +17,15 @@
   "use strict";
 
   const STATES = {
-    idle:      { hue: 0.62, sat: 0.85, speed: 0.28, pulse: 0.06, glow: 0.55, noise: 0.55 },
+    // Hues are where the sphere's centre lands after the shader's iridescent
+    // shift, so idle reads as blue, not the magenta the raw value would give.
+    idle:      { hue: 0.58, sat: 0.85, speed: 0.28, pulse: 0.06, glow: 0.55, noise: 0.55 },
     wake:      { hue: 0.50, sat: 1.00, speed: 0.60, pulse: 0.18, glow: 0.90, noise: 0.75 },
-    listening: { hue: 0.45, sat: 1.00, speed: 0.80, pulse: 0.22, glow: 1.00, noise: 0.85 },
-    thinking:  { hue: 0.72, sat: 0.95, speed: 1.40, pulse: 0.10, glow: 0.75, noise: 1.10 },
-    speaking:  { hue: 0.58, sat: 0.88, speed: 0.90, pulse: 0.28, glow: 0.85, noise: 0.70 },
-    acting:    { hue: 0.38, sat: 0.90, speed: 1.10, pulse: 0.14, glow: 0.80, noise: 0.95 },
-    needs:     { hue: 0.10, sat: 0.95, speed: 0.45, pulse: 0.30, glow: 0.95, noise: 0.60 },
+    listening: { hue: 0.46, sat: 1.00, speed: 0.80, pulse: 0.22, glow: 1.00, noise: 0.85 },
+    thinking:  { hue: 0.70, sat: 0.95, speed: 1.40, pulse: 0.10, glow: 0.75, noise: 1.10 },
+    speaking:  { hue: 0.56, sat: 0.88, speed: 0.90, pulse: 0.28, glow: 0.85, noise: 0.70 },
+    acting:    { hue: 0.36, sat: 0.90, speed: 1.10, pulse: 0.14, glow: 0.80, noise: 0.95 },
+    needs:     { hue: 0.09, sat: 0.95, speed: 0.45, pulse: 0.30, glow: 0.95, noise: 0.60 },
   };
 
   const VS = `#version 300 es
@@ -34,6 +36,7 @@ void main(){ v_uv = a_pos*0.5+0.5; gl_Position = vec4(a_pos,0.0,1.0); }`;
 precision highp float;
 in vec2 v_uv; out vec4 fragColor;
 uniform float uTime, uHue, uSat, uSpeed, uPulse, uGlow, uNoise, uAudio; uniform vec2 uRes;
+vec3 mod289(vec3 x){ return x - floor(x*(1./289.))*289.; }
 vec4 mod289(vec4 x){ return x - floor(x*(1./289.))*289.; }
 vec4 perm(vec4 x){ return mod289(((x*34.)+1.)*x); }
 float snoise3(vec3 v){
@@ -79,7 +82,7 @@ void main(){
   float n1 = fbm(np); float n2 = fbm(np*1.8 + vec3(n1*0.4, t*0.09, 0.7));
   float n3 = snoise3(np*3.2 + vec3(0, n2*0.3, t*0.22));
   float N = (n1*0.55 + n2*0.30 + n3*0.15) * (uNoise + uAudio*0.6);
-  float irid = N*0.18 + thickness*0.25 + dot(nrm,normalize(vec3(0.6,0.8,1.0)))*0.15;
+  float irid = N*0.10 + thickness*0.07 + dot(nrm,normalize(vec3(0.6,0.8,1.0)))*0.05;
   float hue = mod(uHue + irid, 1.0);
   float fresnel = pow(1.0 - max(dot(nrm, -rd), 0.0), 3.5);
   vec3 ld = normalize(vec3(0.8, 1.2, 1.6)); float diff = max(dot(nrm,ld),0.0);

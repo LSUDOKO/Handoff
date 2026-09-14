@@ -36,6 +36,39 @@ def ready() -> bool:
         return False
 
 
+_client: Any = None
+_client_born = 0.0
+#: How long one streaming client is reused. Its credentials are frozen from
+#: boto3 when it is built, so it is rebuilt well inside any token's lifetime.
+_CLIENT_TTL = 20 * 60
+
+
+def _streaming_client() -> Any:
+    """One ``TranscribeStreamingClient`` for the process, on static credentials.
+
+    The SDK's default credential chain probes every source on a cold start
+    and took seven seconds before the first word came back; handing it the
+    credentials boto3 already resolved takes a second and a half, and
+    reusing the client keeps it there.
+    """
+    global _client, _client_born
+    import time
+
+    if _client is None or time.monotonic() - _client_born > _CLIENT_TTL:
+        import boto3
+        from amazon_transcribe.auth import StaticCredentialResolver
+        from amazon_transcribe.client import TranscribeStreamingClient
+
+        creds = boto3.Session().get_credentials()
+        resolver = None
+        if creds is not None:
+            frozen = creds.get_frozen_credentials()
+            resolver = StaticCredentialResolver(frozen.access_key, frozen.secret_key, frozen.token)
+        _client = TranscribeStreamingClient(region=config.AWS_REGION, credential_resolver=resolver)
+        _client_born = time.monotonic()
+    return _client
+
+
 class LiveTranscription:
     """One open Transcribe streaming session: PCM in, text out, as it comes.
 
@@ -52,9 +85,7 @@ class LiveTranscription:
 
     @classmethod
     async def open(cls, rate: int = 16000, language: str = "en-US") -> LiveTranscription:
-        from amazon_transcribe.client import TranscribeStreamingClient
-
-        client = TranscribeStreamingClient(region=config.AWS_REGION)
+        client = _streaming_client()
         stream = await client.start_stream_transcription(
             language_code=language,
             media_sample_rate_hz=rate,
@@ -127,10 +158,21 @@ async def _stream(pcm: bytes, rate: int, language: str) -> str:
 
 
 def transcribe_pcm(pcm: bytes, rate: int = 16000, language: str = "en-US") -> str:
-    """Speech → text for one utterance of 16-bit mono PCM."""
+    """Speech → text for one utterance of 16-bit mono PCM.
+
+    Safe to call from a thread that already runs an event loop: the stream
+    then gets a loop of its own on a helper thread.
+    """
     if not pcm:
         return ""
-    return asyncio.run(_stream(pcm, rate, language))
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(_stream(pcm, rate, language))
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, _stream(pcm, rate, language)).result()
 
 
 @lru_cache(maxsize=64)

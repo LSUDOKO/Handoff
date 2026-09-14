@@ -19,6 +19,7 @@
   const handsfreeBox = $('[data-role="handsfree"]');
 
   const orb = window.HandoffOrb ? HandoffOrb.mount(canvas, { fallbackEl }) : { setState() {}, setLevel() {} };
+  window.handoffOrbInstance = orb;
   let mode = "idle";                               // idle | listening | thinking | speaking
   let handsfree = false;
   try { handsfree = localStorage.getItem("handoff:handsfree") === "on"; } catch {}
@@ -110,9 +111,10 @@
       setMode("thinking", "Transcribing…");
       let text = null;
       if (ws) {
-        // Wait briefly for the final; the stabilised partial is already on
-        // screen and is what a person would accept, so use it if the final is slow.
-        try { if (ws.readyState === 1) ws.send(JSON.stringify({ type: "end" })); text = await Promise.race([done, new Promise((r) => setTimeout(() => r(undefined), 2500))]); } catch { text = null; }
+        // Wait for the final. A short utterance can end before the session has
+        // said anything at all, so give it real time; if a stabilised partial
+        // is on screen by then, that is what a person would accept.
+        try { if (ws.readyState === 1) ws.send(JSON.stringify({ type: "end" })); text = await Promise.race([done, new Promise((r) => setTimeout(() => r(undefined), 9000))]); } catch { text = null; }
         if (text === undefined) text = [...finals, live].join(" ").trim() || null;
         try { ws.close(); } catch {}
       }
@@ -168,7 +170,11 @@
     transcript.textContent = text;
     line("you", "You", text);
     // A decision on screen and a phrase like "archive it": answer it here, no model round-trip.
-    const card = document.querySelector("#work-panel .waiting-card.needs form.quick");
+    // A spoken answer goes to the decision it is least sure about — the one it
+    // would ask about first if it could only ask once.
+    const cards = [...document.querySelectorAll("#work-panel .waiting-card.needs")];
+    const pct = (c) => parseInt((c.querySelector(".badge.needs")?.textContent || "100"), 10) || 100;
+    const card = cards.sort((a, b) => pct(a) - pct(b))[0]?.querySelector("form.quick");
     if (card) {
       const options = [...card.querySelectorAll('button[name="action"]')].map((b) => b.value);
       try {
@@ -202,7 +208,9 @@
     const es = new EventSource(`/orb/${encodeURIComponent(chatId)}/events?turn=${encodeURIComponent(turn)}`);
     const on = (k, fn) => es.addEventListener(k, (e) => { try { fn(JSON.parse(e.data)); } catch (err) { console.warn(err); } });
     let reply = null, text = "";
-    const visible = (s) => s.replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, "").replace(/<thinking>[\s\S]*$/i, "").replace(/```[\s\S]*?```/g, "").trim();
+    // Nova narrates inside <thinking> tags. Drop closed blocks, an unclosed
+    // block, and a tag that is still arriving one character at a time.
+    const visible = (s) => s.replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, "").replace(/<thinking[\s\S]*$/i, "").replace(/<\/?[a-z]*$/i, "").replace(/```[\s\S]*?```/g, "").trim();
     on("delta", (ev) => { text += ev.text || ""; const v = visible(text); if (v) { if (!reply) reply = line("handoff", "Handoff", ""); reply.querySelector(".ot-text").textContent = v; caption.textContent = v.slice(-140); } });
     on("tool_start", (ev) => { setMode("acting", `${ev.name.replace(/_/g, " ")}…`); toolLine(ev); });
     on("tool_end", (ev) => { const el = thread.querySelector(`[data-tool-id="${CSS.escape(ev.tool_id)}"]`); if (el) { el.classList.remove("running"); el.classList.add(ev.status === "ok" ? "done" : "error"); el.querySelector(".ms").textContent = ev.ms ? ` ${ev.ms}ms` : ""; } if (mode === "acting") setMode("thinking", "Thinking…"); });

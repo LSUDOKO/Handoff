@@ -45,3 +45,8 @@ site/dist/
 
 # wrangler local cache
 .wrangler/
+
+# Demo film build artefacts (regenerable; the MP4s are handed over, not committed)
+video/node_modules
+video/out/
+video/public/

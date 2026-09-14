@@ -1,0 +1,21 @@
+{
+  "name": "handoff-demo-video",
+  "private": true,
+  "version": "1.0.0",
+  "description": "The Handoff demo film, composed in Remotion from real footage, real screenshots and Polly narration.",
+  "scripts": {
+    "preview": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts HandoffDemo out/handoff-demo.mp4 --gl=angle --concurrency=8",
+    "still": "remotion still src/index.ts HandoffDemo out/still.png --gl=angle"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.524",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "remotion": "4.0.524"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript": "^5.0.0"
+  }
+}

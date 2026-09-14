@@ -31,7 +31,7 @@ every week.
 | **Live site and guides** | <https://handoff-eya.pages.dev> · [docs](https://handoff-eya.pages.dev/docs) |
 | **Pitch** | [deck (PDF)](docs/pitch/deck.pdf) · [deck (PPTX)](docs/pitch/deck.pptx) · [speaker script](docs/pitch/script.md) |
 | **Architecture** | [diagram](docs/architecture.png) · [editable Excalidraw](docs/architecture.excalidraw) · [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
-| **Demo video** | `ADD BEFORE SUBMITTING` · storyboard in [docs/DEMO.md](docs/DEMO.md) |
+| **Demo video** | `ADD BEFORE SUBMITTING` · made by [`video/`](video/) and [`scripts/video/`](scripts/video/) — see [The film](#the-film) |
 
 ---
 
@@ -373,6 +373,41 @@ make desktop                # native window, opens on the orb — or `make serve
 Full credential walkthrough — Gmail's own OAuth sign-in, Linear, Slack, GitHub
 — in [docs/SETUP.md](docs/SETUP.md). The CLI's `--state-dir` always means
 local storage, so a scratch run can never touch the live table.
+
+---
+
+## The film
+
+The demo video is produced, not edited by hand, so it can be re-made after
+any change:
+
+- **Live footage is live.** [`scripts/video/record_live.py`](scripts/video/record_live.py)
+  launches Chromium with a fake microphone fed by a WAV of the spoken
+  sentence, taps the real orb, and records the page while Amazon Transcribe
+  hears it over the WebSocket, Bedrock Nova Pro runs the turn, the workspace
+  card lands, the run graph fills in and the decision card appears. A second
+  clip answers by voice; a third runs again with the learned rule. Every
+  milestone is timestamped so the narration is cut against what happened.
+- **Narration** is Amazon Polly's generative voice, one clip per sentence
+  ([`scripts/video/narrate.py`](scripts/video/narrate.py)); the sentence
+  that quotes the decision's numbers is regenerated from the recorded state.
+- **The composition** is [Remotion](https://www.remotion.dev) —
+  [`video/src`](video/src): typographic scenes, the real screenshots, the
+  Excalidraw diagram panned to what is being said, captions, a music bed.
+  [`scripts/video/build_cues.py`](scripts/video/build_cues.py) turns the
+  recorded timelines into cut points.
+- **The deck cut** is the Marp deck narrated slide by slide and stitched with
+  ffmpeg ([`scripts/video/deck_video.py`](scripts/video/deck_video.py)).
+
+```bash
+python scripts/video/narrate.py <work>/audio          # Polly, per sentence
+python scripts/video/record_live.py <work>/audio <work>/clips
+python scripts/video/build_cues.py <work>/clips <state-dir> <work>/audio
+scripts/video/prepare_assets.sh <work> && scripts/video/render.sh
+python scripts/video/deck_video.py <work>/deck out/handoff-pitch-deck.mp4
+```
+
+The MP4s are not committed; they are uploaded with the submission.
 
 ---
 

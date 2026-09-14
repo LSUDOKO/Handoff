@@ -1,0 +1,134 @@
+{
+ "say": {
+  "file": "clips/clip-setup.mp4",
+  "segments": [
+   {
+    "kind": "play",
+    "from": 7.739999999999999,
+    "to": 22.42,
+    "rate": 1.0
+   },
+   {
+    "kind": "play",
+    "from": 30.04,
+    "to": 39.0,
+    "rate": 1.0
+   }
+  ]
+ },
+ "run": {
+  "file": "clips/clip-setup.mp4",
+  "segments": [
+   {
+    "kind": "play",
+    "from": 39.0,
+    "to": 53.733333,
+    "rate": 1.0
+   }
+  ]
+ },
+ "decide": {
+  "file": "clips/clip-decide.mp4",
+  "segments": [
+   {
+    "kind": "play",
+    "from": 11.15,
+    "to": 20.233333,
+    "rate": 1.0
+   }
+  ]
+ },
+ "again": {
+  "file": "clips/clip-again.mp4",
+  "segments": [
+   {
+    "kind": "play",
+    "from": 11.24,
+    "to": 251.733333,
+    "rate": 2.0
+   }
+  ],
+  "graphAt": null
+ },
+ "decision": {
+  "confidence": 0.6,
+  "threshold": 0.7,
+  "reasoning": "The sender is unknown, and the content is not clear. This requires human judgement.",
+  "subject": "Strategic partnership opportunity \u2014 time sensitive",
+  "sender": "partnerships@vendor.com",
+  "stillSeconds": 15.0
+ },
+ "rule": {
+  "pattern": "Archive emails from the CFO office.",
+  "action": "archive",
+  "match": "cfo@company.com",
+  "holdSeconds": 3.5
+ },
+ "gate": {
+  "lines": [
+   {
+    "text": "",
+    "key": false
+   },
+   {
+    "text": "# --- THE LINE THE WHOLE PROJECT IS BUILT AROUND ---------------------",
+    "key": false
+   },
+   {
+    "text": "# First pass: raises InterruptException and suspends the agent loop.",
+    "key": false
+   },
+   {
+    "text": "# After resume: returns the human's answer and execution continues.",
+    "key": false
+   },
+   {
+    "text": "response = event.interrupt(",
+    "key": true
+   },
+   {
+    "text": "    interrupt_name,",
+    "key": false
+   },
+   {
+    "text": "    reason=payload.model_dump(mode=\"json\"),",
+    "key": false
+   },
+   {
+    "text": ")",
+    "key": false
+   },
+   {
+    "text": "# --------------------------------------------------------------------",
+    "key": false
+   },
+   {
+    "text": "",
+    "key": false
+   },
+   {
+    "text": "decision = normalise_response(response, payload)",
+    "key": false
+   }
+  ]
+ },
+ "timeline": {
+  "setup": {
+   "listen_start": 8.94,
+   "listen_stop": 21.62,
+   "first_tool": 31.04,
+   "card": 37.4,
+   "graph": 39.12,
+   "needs": 54.56
+  },
+  "decide": {
+   "listen_start": 12.15,
+   "decided": 19.79
+  },
+  "again": {
+   "listen_start": 12.24,
+   "graph": null,
+   "done": null
+  }
+ }
+}

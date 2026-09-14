@@ -1,0 +1,115 @@
+{
+  "voice": "Matthew",
+  "engine": "generative",
+  "scenes": [
+    {
+      "id": "open",
+      "sentences": [
+        "Handoff.",
+        "Describe a chore in one sentence, hand it off, and it runs — asking you only when there is a real decision to make."
+      ]
+    },
+    {
+      "id": "problem",
+      "sentences": [
+        "Every professional loses the first half hour of the day to the same small work.",
+        "Triage the inbox. File the real asks. Archive the noise.",
+        "None of it is hard. It is just every single morning, and never worth building a tool for.",
+        "And the thing people actually fear from an agent is not that it is slow. It is that it does something they never sanctioned."
+      ]
+    },
+    {
+      "id": "brief",
+      "sentences": [
+        "The Agents for Humans brief put it exactly: an agent that runs autonomously and only surfaces when there is a real decision to make.",
+        "We built that sentence."
+      ]
+    },
+    {
+      "id": "say",
+      "sentences": [
+        "This is Talk. I tap the orb and say it: every weekday at eight, triage my inbox, real asks become tickets, newsletters get archived, ask me about anything unsure.",
+        "The caption fills in while I speak. That is Amazon Transcribe, streaming.",
+        "Four tool calls later the agent has picked the integrations, written the cron, decided where the line sits between what it may do alone and what it must ask about, and switched it on."
+      ]
+    },
+    {
+      "id": "run",
+      "sentences": [
+        "And this is it running, on Amazon Bedrock.",
+        "That graph is the Strands Graph itself, drawn live from its own hook events.",
+        "Memory checks for rules. Gmail reads the inbox. The executor judges every message, acts on the clear ones, and sets the unsure one aside.",
+        "It did not freeze the inbox on the hard one. It finished the pass, and asked once."
+      ]
+    },
+    {
+      "id": "decision",
+      "sentences": [
+        "One screen, one decision.",
+        "Here is why it stopped, in the agent's own words: unknown vendor, strategic partnership, CEO intro call. I cannot tell if this is a real lead or phishing.",
+        "Sixty percent sure. It needs seventy to act alone. That gap is the product.",
+        "I say: archive it, it is cold outreach. Matched locally, no model round trip, and the run resumes exactly where it stopped."
+      ]
+    },
+    {
+      "id": "quieter",
+      "sentences": [
+        "My answer became a rule. Not a vague one: exact sender, whole domain, or two distinct keywords.",
+        "Same inbox, next run: handled alone, one from the rule, zero questions.",
+        "It gets quieter the longer you use it."
+      ]
+    },
+    {
+      "id": "gate",
+      "sentences": [
+        "The whole product is one line.",
+        "A before-tool-call hook sits in front of the only tool that changes anything. Below the threshold it raises the interrupt before the tool body runs, so nothing has happened to your mail.",
+        "The graph state is serialised: a run paused at eight and answered at eleven thirty is the same run."
+      ]
+    },
+    {
+      "id": "architecture",
+      "sentences": [
+        "Three agents, one graph.",
+        "The builder turns a sentence into a config. The executor runs it as a Strands Graph, trigger, executor, completer, with the gate on the executor. The learner turns each decision into a rule.",
+        "Speech is Transcribe and Polly. State is one DynamoDB table. Rules live in AgentCore Memory."
+      ]
+    },
+    {
+      "id": "strands",
+      "sentences": [
+        "Every Strands feature the brief names is doing a real job.",
+        "Graph and GraphBuilder. The interrupt hook. Invocation hooks for the narrator that draws the graph. A session repository, so the terminal and the browser share one conversation. MCP clients for Gmail, Linear, Slack and GitHub."
+      ]
+    },
+    {
+      "id": "aws",
+      "sentences": [
+        "It is deployed.",
+        "AgentCore Runtime runs the graph as an arm sixty-four container. AgentCore Memory holds the rules. EventBridge fires the schedule through a twelve-line Lambda.",
+        "And handoff doctor proves every credential with a real call."
+      ]
+    },
+    {
+      "id": "surfaces",
+      "sentences": [
+        "Three surfaces, one gate: the orb, a native desktop window, and a command line where run dash dash watch streams the same events into your terminal.",
+        "Plus a site with the guides."
+      ]
+    },
+    {
+      "id": "close",
+      "sentences": [
+        "Handoff does the boring part. And it knows when to stop and ask.",
+        "Open source, Apache two point zero, at github dot com slash L S U D O K O slash Handoff."
+      ]
+    }
+  ],
+  "spoken_by_user": {
+    "voice": "Stephen",
+    "setup": "Every weekday at eight, triage my inbox. Real requests from teammates become Linear tickets, newsletters get archived, and ask me about anything you're not sure about. Set it up and run it now.",
+    "decide": "Archive it. It's cold outreach.",
+    "again": "Run it again.",
+    "decide_generic": "Archive it."
+  }
+}
