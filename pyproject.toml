@@ -36,8 +36,17 @@ anthropic = ["anthropic>=0.40.0"]
 bedrock = ["boto3>=1.35.0", "amazon-transcribe>=0.6.0"]
 # Serverless deployment on Bedrock AgentCore.
 agentcore = ["bedrock-agentcore>=0.1.0"]
-# Native desktop window.
-desktop = ["pywebview>=5.0"]
+# Native desktop window. Windows uses the WebView2 runtime that ships with
+# Windows 10/11 and macOS uses WebKit, so pywebview alone is enough there.
+# Linux needs the GTK/WebKit bridge: PyGObject builds against the system
+# gobject-introspection and webkit2gtk, which the distro packages provide
+# (see docs/INSTALL.md) — without it pywebview reports "GTK cannot be loaded"
+# and silently falls back to a browser tab.
+desktop = [
+    "pywebview>=5.0",
+    "pycairo>=1.26; sys_platform == 'linux'",
+    "PyGObject>=3.50; sys_platform == 'linux'",
+]
 # Microphone from the terminal and the desktop window (needs PortAudio).
 voice = ["sounddevice>=0.5"]
 # A credential-free MCP server, so a fresh clone can read a real web page.

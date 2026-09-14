@@ -339,6 +339,17 @@ page with the live orb, and the guides — built by `site/build.py` from
 
 ## Run it yourself
 
+**Just to use it**, on Windows, Linux or macOS — one command, no checkout:
+
+```bash
+pipx install "handoff[bedrock,desktop,voice,web]"
+handoff desktop
+```
+
+Linux needs GTK and WebKit from your distribution for the native window, and
+Windows needs nothing beyond Python. Both are spelled out, per distribution, in
+**[docs/INSTALL.md](docs/INSTALL.md)**.
+
 **With nothing at all** — the whole loop on a scripted model, no keys, no
 account:
 
