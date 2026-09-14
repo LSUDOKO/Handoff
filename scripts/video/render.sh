@@ -4,6 +4,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="${1:-$ROOT/video/out/handoff-demo.mp4}"
+case "$OUT" in /*) ;; *) OUT="$PWD/$OUT" ;; esac   # absolute, since we cd below
 CHROME=$(ls -d "$HOME"/.cache/ms-playwright/chromium-*/chrome-linux/chrome 2>/dev/null | tail -1)
 cd "$ROOT/video"
 mkdir -p "$(dirname "$OUT")"

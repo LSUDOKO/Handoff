@@ -126,7 +126,15 @@ def main(clips_dir: str, state_dir: str, audio_dir: str) -> int:
     stills = ROOT / "video/public/stills"
     stills.mkdir(parents=True, exist_ok=True)
     scroll = first(setup, event="scroll", to="decisions") or needs
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str((scroll or 0) + 1.6), "-i", str(clips / "clip-setup.mp4"), "-frames:v", "1", str(stills / "decision.png")], check=True)
+    # The page's clock can run past the footage (the recorder settles after the
+    # last event), so clamp to the clip or ffmpeg writes nothing and an old
+    # still from a previous take survives.
+    at_s = min((scroll or 0) + 1.6, lengths["setup"] - 0.5)
+    still = stills / "decision.png"
+    still.unlink(missing_ok=True)
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{at_s:.2f}", "-i", str(clips / "clip-setup.mp4"), "-frames:v", "1", str(still)], check=True)
+    if not still.exists():
+        raise SystemExit(f"no decision still at {at_s:.2f}s of clip-setup.mp4")
 
     cues = {
         "say": {"file": "clips/clip-setup.mp4", "segments": say},

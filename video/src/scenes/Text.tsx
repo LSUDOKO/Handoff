@@ -28,7 +28,7 @@ export const Open = ({ scene }: { scene: Scene }) => (
       </Rise>
     </div>
     <Orb src="stills/orb-idle.png" size={560} x={1240} y={240} delay={4} />
-    <Rise at={at(scene, 1) + 20} style={{ position: "absolute", left: 96, bottom: 72, display: "flex", gap: 12 }}>
+    <Rise at={at(scene, 1) + 20} style={{ position: "absolute", right: 96, top: 76, display: "flex", gap: 12 }}>
       <Pill accent>Agents for Humans · Professional track</Pill><Pill>Strands Agents SDK</Pill><Pill>Bedrock · AgentCore · Transcribe · Polly</Pill>
     </Rise>
   </AbsoluteFill>
