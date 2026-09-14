@@ -174,6 +174,26 @@ def _wait_until_up(port: int, timeout: float = 30.0) -> bool:
     return False
 
 
+def _page_still_there(port: int, path: str) -> bool:
+    """Does the remembered page still resolve?
+
+    A chat that has since been deleted (or any state reset) leaves the saved
+    path pointing at a 404 that renders as raw JSON — a blank-looking window
+    with ``{"detail":"No such chat"}`` in the corner is the first thing the
+    user sees. Checking costs one local request; guessing costs the launch.
+    """
+    try:
+        import urllib.request
+
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{port}{path}", method="HEAD"
+        )
+        with urllib.request.urlopen(request, timeout=3.0) as response:
+            return response.status < 400
+    except Exception:
+        return False
+
+
 def main(port: int | None = None, width: int = 1360, height: int = 880) -> int:
     preferred = port or config.UI_PORT
     state = _load_state()
@@ -193,9 +213,14 @@ def main(port: int | None = None, width: int = 1360, height: int = 880) -> int:
             return 1
 
     last_page = state.get("page") or DEFAULT_PAGE
-    if last_page in ("", "/"):
+    if last_page in ("", "/") or not last_page.startswith("/"):
         last_page = DEFAULT_PAGE
-    url = f"http://127.0.0.1:{actual}{last_page if last_page.startswith('/') else DEFAULT_PAGE}"
+    # The remembered page may have been deleted since it was saved; fall back
+    # to the orb rather than opening on a 404 body.
+    if last_page != DEFAULT_PAGE and not _page_still_there(actual, last_page):
+        print(f"[handoff] {last_page} is gone — opening on {DEFAULT_PAGE}")
+        last_page = DEFAULT_PAGE
+    url = f"http://127.0.0.1:{actual}{last_page}"
 
     try:
         import webview

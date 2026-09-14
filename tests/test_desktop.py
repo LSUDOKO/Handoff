@@ -62,3 +62,32 @@ def test_status_names_the_backend():
 
     status = DesktopBridge(stream_factory=FakeStream).status()
     assert status["mic"] is True and status["backend"] == "sounddevice"
+
+
+def test_stale_page_falls_back_to_the_orb(monkeypatch):
+    """A chat deleted since last launch must not open as a raw 404 body."""
+    from handoff import desktop
+
+    def gone(port, path):
+        return False
+
+    monkeypatch.setattr(desktop, "_page_still_there", gone)
+    assert desktop._page_still_there(8000, "/chat/chat_missing") is False
+
+
+def test_live_page_is_kept(monkeypatch):
+    from handoff import desktop
+
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    import urllib.request
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: Response())
+    assert desktop._page_still_there(8000, "/chat/chat_live") is True
