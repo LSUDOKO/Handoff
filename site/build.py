@@ -35,11 +35,16 @@ sys.path.insert(0, str(ROOT / "src"))
 APP_ORB = ROOT / "src" / "handoff" / "web" / "static" / "orb.js"
 FALLBACK_ORB = SITE / "assets" / "orb-fallback.js"
 SCREENS = ROOT / "docs" / "screens"
+DOCS = ROOT / "docs"
+DOCS_ASSETS = DOCS / "assets"
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
 
 HEADERS = """\
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 /screens/*
+  Cache-Control: public, max-age=604800
+/docs-assets/*
   Cache-Control: public, max-age=604800
 /*
   X-Content-Type-Options: nosniff
@@ -115,7 +120,7 @@ def build(out: Path) -> tuple[int, int, list[str]]:
     notes: list[str] = []
     count = 0
 
-    for sub in ("assets", "docs", "screens"):
+    for sub in ("assets", "docs", "screens", "docs-assets"):
         shutil.rmtree(out / sub, ignore_errors=True)
         (out / sub).mkdir(parents=True, exist_ok=True)
 
@@ -170,8 +175,29 @@ def build(out: Path) -> tuple[int, int, list[str]]:
         count += 1
 
     # -- screenshots -------------------------------------------------------
-    for png in sorted(SCREENS.glob("*.png")):
-        shutil.copy2(png, out / "screens" / png.name)
+    # The whole tree, subdirectories included (ui/, terminal/, aws/), so every
+    # image the README points at has a public URL.
+    for src in sorted(SCREENS.rglob("*")):
+        if not src.is_file() or src.suffix.lower() not in IMAGE_SUFFIXES:
+            continue
+        dest = out / "screens" / src.relative_to(SCREENS)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+        count += 1
+
+    # -- docs images (header, architecture diagrams) -------------------------
+    for src in sorted(DOCS_ASSETS.rglob("*")) if DOCS_ASSETS.is_dir() else []:
+        if not src.is_file() or src.suffix.lower() not in IMAGE_SUFFIXES:
+            continue
+        dest = out / "docs-assets" / src.relative_to(DOCS_ASSETS)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+        count += 1
+
+    for src in sorted(DOCS.glob("*")):
+        if not src.is_file() or src.suffix.lower() not in IMAGE_SUFFIXES:
+            continue
+        shutil.copy2(src, out / "docs-assets" / src.name)
         count += 1
 
     # -- Cloudflare Pages control files -------------------------------------

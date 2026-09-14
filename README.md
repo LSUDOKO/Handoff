@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/header.png" alt="Handoff — Describe it. Hand it off. It runs." width="100%">
+  <img src="https://handoff-eya.pages.dev/docs-assets/header.png" alt="Handoff — Describe it. Hand it off. It runs." width="100%">
 </p>
 
 <p align="center">
@@ -30,7 +30,7 @@ every week.
 |---|---|
 | **Live site and guides** | <https://handoff-eya.pages.dev> · [docs](https://handoff-eya.pages.dev/docs) |
 | **Pitch** | [deck (PDF)](docs/pitch/deck.pdf) · [deck (PPTX)](docs/pitch/deck.pptx) · [speaker script](docs/pitch/script.md) |
-| **Architecture** | [diagram (AWS icons)](docs/architecture-aws.png) · [draw.io source](docs/architecture.drawio) · [PDF](docs/architecture.pdf) · [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| **Architecture** | [diagram (AWS icons)](https://handoff-eya.pages.dev/docs-assets/architecture-aws.png) · [draw.io source](docs/architecture.drawio) · [PDF](docs/architecture.pdf) · [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | **Demo video** | `ADD BEFORE SUBMITTING` · made by [`video/`](video/) and [`scripts/video/`](scripts/video/) — see [The film](#the-film) |
 
 ---
@@ -60,9 +60,9 @@ anything unsure. Set it up and run it now."*
 
 | | |
 |---|---|
-| ![Talk](docs/screens/orb.png) | ![The run graph](docs/screens/ui/orb-graph.png) |
+| ![Talk](https://handoff-eya.pages.dev/screens/orb.png) | ![The run graph](https://handoff-eya.pages.dev/screens/ui/orb-graph.png) |
 | **1 · Say it.** The caption fills in while you speak (Amazon Transcribe, streaming). Four tool calls later the workflow is saved, switched on, and started. | **2 · Watch it run.** The Strands Graph, drawn live from its own hook events: memory applied a rule, Gmail read eight, the executor handled seven and set one aside. |
-| ![Decision](docs/screens/decision.png) | ![Terminal](docs/screens/terminal/run-watch.png) |
+| ![Decision](https://handoff-eya.pages.dev/screens/decision.png) | ![Terminal](https://handoff-eya.pages.dev/screens/terminal/run-watch.png) |
 | **3 · One question.** Why it stopped, in the agent's words; how sure it was; four buttons — or say *"archive it"*. | **4 · Or from the terminal.** `handoff run --watch` streams the same events; every command takes `--json`. |
 
 Every screenshot in this README was taken from the running product between
@@ -76,13 +76,13 @@ through the AWS CLI. Nothing is mocked up.
 
 | Requirement | How Handoff meets it | Proof |
 |---|---|---|
-| Runs autonomously | A Strands `Graph` (trigger → executor → completer) runs on a cron schedule — in-process on the desktop, EventBridge → Lambda → **AgentCore Runtime** in the cloud | [run graph](docs/screens/ui/orb-graph.png) · [`aws scheduler` / `lambda`](docs/screens/aws/scheduler-lambda.png) |
-| Surfaces only for real decisions | A `BeforeToolCallEvent` hook gates the one tool that changes anything; below the confidence threshold it defers, then asks **once** for the whole batch | [decision screen](docs/screens/decision.png) · [`hitl.py`](src/handoff/graph/hooks/hitl.py) |
-| Built on the Strands Agents SDK | `Agent`, `Graph`, hooks, `event.interrupt()`, `SessionRepository`, `MCPClient`, 16 `@tool`s | [imports proof](docs/screens/terminal/strands.png) · [table below](#built-on-strands--with-proof) |
-| Uses AWS | Bedrock (Nova), AgentCore Runtime + Memory, Transcribe, Polly, DynamoDB, EventBridge, Lambda, ECR — all live in `ap-northeast-2` | [`handoff doctor`](docs/screens/terminal/doctor.png) · [AgentCore](docs/screens/aws/agentcore.png) · [DynamoDB](docs/screens/aws/dynamodb.png) |
-| Professional use | Inbox triage, PR review triage, competitor pricing watch, Slack digest, meeting follow-up — shipped as templates; anything else described in a sentence | [workflows](docs/screens/terminal/workflows.png) · [discover](docs/screens/ui/discover.png) |
-| Learns the person | Each decision becomes a narrow rule (sender, domain, or two keywords); AgentCore Memory in the cloud, JSON locally; the next run asks less | [decide → rule](docs/screens/terminal/decide.png) · [memory](docs/screens/ui/memory.png) |
-| Real, not scripted | Verified end-to-end on Bedrock Nova: a spoken sentence ends as an active, running workflow; 8 items, 7 handled alone, 1 escalated | [ask](docs/screens/terminal/ask.png) · [inspect](docs/screens/terminal/inspect.png) · [usage](docs/screens/terminal/usage.png) |
+| Runs autonomously | A Strands `Graph` (trigger → executor → completer) runs on a cron schedule — in-process on the desktop, EventBridge → Lambda → **AgentCore Runtime** in the cloud | [run graph](https://handoff-eya.pages.dev/screens/ui/orb-graph.png) · [`aws scheduler` / `lambda`](https://handoff-eya.pages.dev/screens/aws/scheduler-lambda.png) |
+| Surfaces only for real decisions | A `BeforeToolCallEvent` hook gates the one tool that changes anything; below the confidence threshold it defers, then asks **once** for the whole batch | [decision screen](https://handoff-eya.pages.dev/screens/decision.png) · [`hitl.py`](src/handoff/graph/hooks/hitl.py) |
+| Built on the Strands Agents SDK | `Agent`, `Graph`, hooks, `event.interrupt()`, `SessionRepository`, `MCPClient`, 16 `@tool`s | [imports proof](https://handoff-eya.pages.dev/screens/terminal/strands.png) · [table below](#built-on-strands--with-proof) |
+| Uses AWS | Bedrock (Nova), AgentCore Runtime + Memory, Transcribe, Polly, DynamoDB, EventBridge, Lambda, ECR — all live in `ap-northeast-2` | [`handoff doctor`](https://handoff-eya.pages.dev/screens/terminal/doctor.png) · [AgentCore](https://handoff-eya.pages.dev/screens/aws/agentcore.png) · [DynamoDB](https://handoff-eya.pages.dev/screens/aws/dynamodb.png) |
+| Professional use | Inbox triage, PR review triage, competitor pricing watch, Slack digest, meeting follow-up — shipped as templates; anything else described in a sentence | [workflows](https://handoff-eya.pages.dev/screens/terminal/workflows.png) · [discover](https://handoff-eya.pages.dev/screens/ui/discover.png) |
+| Learns the person | Each decision becomes a narrow rule (sender, domain, or two keywords); AgentCore Memory in the cloud, JSON locally; the next run asks less | [decide → rule](https://handoff-eya.pages.dev/screens/terminal/decide.png) · [memory](https://handoff-eya.pages.dev/screens/ui/memory.png) |
+| Real, not scripted | Verified end-to-end on Bedrock Nova: a spoken sentence ends as an active, running workflow; 8 items, 7 handled alone, 1 escalated | [ask](https://handoff-eya.pages.dev/screens/terminal/ask.png) · [inspect](https://handoff-eya.pages.dev/screens/terminal/inspect.png) · [usage](https://handoff-eya.pages.dev/screens/terminal/usage.png) |
 
 ---
 
@@ -94,7 +94,7 @@ while a tool runs, and **amber only when it is waiting on you**. Tap it, hold
 `Space`, or switch on hands-free and it ends each utterance on silence and
 listens again after it answers. `Ctrl+Space` opens it from any page.
 
-<p align="center"><img src="docs/screens/ui/orb-card.png" width="100%" alt="The workspace card a sentence became"></p>
+<p align="center"><img src="https://handoff-eya.pages.dev/screens/ui/orb-card.png" width="100%" alt="The workspace card a sentence became"></p>
 
 What a spoken turn produces is drawn on the page from the agent's own events:
 
@@ -105,7 +105,7 @@ What a spoken turn produces is drawn on the page from the agent's own events:
   with milliseconds, until it lands on DONE or NEEDS YOU;
 - the **decision card** when it stops — answerable with a click or a phrase.
 
-<p align="center"><img src="docs/screens/ui/orb-work-panel.png" width="100%" alt="The work panel: run graph and decision cards"></p>
+<p align="center"><img src="https://handoff-eya.pages.dev/screens/ui/orb-work-panel.png" width="100%" alt="The work panel: run graph and decision cards"></p>
 
 Spoken decisions — *archive it, file a ticket, draft a reply, leave it* — are
 matched locally with no model round-trip. Speech streams to **Amazon
@@ -147,7 +147,7 @@ on everything is just a worse inbox.
 
 ## Architecture
 
-<p align="center"><img src="docs/architecture-aws.png" width="100%" alt="Handoff architecture — AWS architecture icons"></p>
+<p align="center"><img src="https://handoff-eya.pages.dev/docs-assets/architecture-aws.png" width="100%" alt="Handoff architecture — AWS architecture icons"></p>
 
 Official AWS Architecture Icons, drawn in draw.io: the editable source is
 [`docs/architecture.drawio`](docs/architecture.drawio) (open it at
@@ -177,7 +177,7 @@ name at 8am, "different every time" is a bug.
 
 ## Built on Strands — with proof
 
-<p align="center"><img src="docs/screens/terminal/strands.png" width="100%" alt="Strands versions and every import"></p>
+<p align="center"><img src="https://handoff-eya.pages.dev/screens/terminal/strands.png" width="100%" alt="Strands versions and every import"></p>
 
 | SDK feature | Where it earns its place |
 |---|---|
@@ -202,7 +202,7 @@ answer on resume — so pin the version before changing the gate.
 
 <details>
 <summary><b>The tests that matter</b> (255 passing, lint clean)</summary>
-<p align="center"><img src="docs/screens/terminal/tests.png" width="100%" alt="make test"></p>
+<p align="center"><img src="https://handoff-eya.pages.dev/screens/terminal/tests.png" width="100%" alt="make test"></p>
 
 [`tests/test_hitl_gate.py`](tests/test_hitl_gate.py) drives the gate inside a
 real Strands agent and asserts the things that actually matter: an unsure call
@@ -222,26 +222,26 @@ Everything below is live in `ap-northeast-2`, captured with the AWS CLI on
 
 | Service | Purpose | Proof |
 |---|---|---|
-| **Amazon Bedrock** — Nova Pro / Nova Lite | reasoning for every agent, through cross-region inference profiles | [inference profiles + doctor](docs/screens/aws/bedrock-speech.png) |
-| **AgentCore Runtime** | serverless background execution, arm64 container, session per run, long-running invocations | [`list-agent-runtimes` → READY](docs/screens/aws/agentcore.png) |
-| **AgentCore Memory** | learned preferences across runs | [`list-memories` → ACTIVE](docs/screens/aws/agentcore.png) |
-| **Amazon Transcribe** (streaming) | hears you — partial results while you speak | [Polly voices + `doctor speech`](docs/screens/aws/bedrock-speech.png) |
+| **Amazon Bedrock** — Nova Pro / Nova Lite | reasoning for every agent, through cross-region inference profiles | [inference profiles + doctor](https://handoff-eya.pages.dev/screens/aws/bedrock-speech.png) |
+| **AgentCore Runtime** | serverless background execution, arm64 container, session per run, long-running invocations | [`list-agent-runtimes` → READY](https://handoff-eya.pages.dev/screens/aws/agentcore.png) |
+| **AgentCore Memory** | learned preferences across runs | [`list-memories` → ACTIVE](https://handoff-eya.pages.dev/screens/aws/agentcore.png) |
+| **Amazon Transcribe** (streaming) | hears you — partial results while you speak | [Polly voices + `doctor speech`](https://handoff-eya.pages.dev/screens/aws/bedrock-speech.png) |
 | **Amazon Polly** (neural) | speaks back | same |
-| **DynamoDB** | one table, `pk` = collection, `sk` = id — configs, runs, interrupts, sessions, usage, audit | [`describe-table`](docs/screens/aws/dynamodb.png) |
-| **EventBridge Scheduler → Lambda** | cron triggers; Scheduler cannot target AgentCore directly, so a twelve-line function forwards the tick | [schedules, function, ECR repo](docs/screens/aws/scheduler-lambda.png) |
+| **DynamoDB** | one table, `pk` = collection, `sk` = id — configs, runs, interrupts, sessions, usage, audit | [`describe-table`](https://handoff-eya.pages.dev/screens/aws/dynamodb.png) |
+| **EventBridge Scheduler → Lambda** | cron triggers; Scheduler cannot target AgentCore directly, so a twelve-line function forwards the tick | [schedules, function, ECR repo](https://handoff-eya.pages.dev/screens/aws/scheduler-lambda.png) |
 | **ECR** | the runtime's image | same |
 | **IAM** | one execution role for the runtime, one for the scheduler with a single permission | [`infra/iam_setup.py`](infra/iam_setup.py) |
 
-<p align="center"><img src="docs/screens/terminal/doctor.png" width="100%" alt="handoff doctor: every check is a real call"></p>
+<p align="center"><img src="https://handoff-eya.pages.dev/screens/terminal/doctor.png" width="100%" alt="handoff doctor: every check is a real call"></p>
 
 <details>
 <summary><b>More AWS proofs</b></summary>
 
 | | |
 |---|---|
-| ![identity](docs/screens/aws/identity.png) | ![agentcore](docs/screens/aws/agentcore.png) |
-| ![dynamodb](docs/screens/aws/dynamodb.png) | ![scheduler + lambda + ecr](docs/screens/aws/scheduler-lambda.png) |
-| ![bedrock + speech](docs/screens/aws/bedrock-speech.png) | ![cloudflare](docs/screens/aws/cloudflare.png) |
+| ![identity](https://handoff-eya.pages.dev/screens/aws/identity.png) | ![agentcore](https://handoff-eya.pages.dev/screens/aws/agentcore.png) |
+| ![dynamodb](https://handoff-eya.pages.dev/screens/aws/dynamodb.png) | ![scheduler + lambda + ecr](https://handoff-eya.pages.dev/screens/aws/scheduler-lambda.png) |
+| ![bedrock + speech](https://handoff-eya.pages.dev/screens/aws/bedrock-speech.png) | ![cloudflare](https://handoff-eya.pages.dev/screens/aws/cloudflare.png) |
 </details>
 
 Deploying is a handful of boto3 scripts, no console clicking:
@@ -286,30 +286,30 @@ your terminal and the conversation continues in the browser (one session
 repository); `handoff build "<sentence>" --activate --run` turns a sentence
 into an active workflow; `handoff talk --mic` is the orb without the orb.
 
-<p align="center"><img src="docs/screens/terminal/help.png" width="100%" alt="handoff --help"></p>
+<p align="center"><img src="https://handoff-eya.pages.dev/screens/terminal/help.png" width="100%" alt="handoff --help"></p>
 
 <details>
 <summary><b>Terminal proofs</b> — a real run on Bedrock Nova, start to finish</summary>
 
 | | |
 |---|---|
-| ![run --watch](docs/screens/terminal/run-watch.png) | ![pending](docs/screens/terminal/pending.png) |
-| ![decide → rule](docs/screens/terminal/decide.png) | ![inspect](docs/screens/terminal/inspect.png) |
-| ![ask](docs/screens/terminal/ask.png) | ![usage](docs/screens/terminal/usage.png) |
-| ![workflows](docs/screens/terminal/workflows.png) | ![agents + skills](docs/screens/terminal/agents-skills.png) |
-| ![mcp](docs/screens/terminal/mcp.png) | ![schedules + credentials](docs/screens/terminal/schedules-creds.png) |
-| ![git log](docs/screens/terminal/gitlog.png) | |
+| ![run --watch](https://handoff-eya.pages.dev/screens/terminal/run-watch.png) | ![pending](https://handoff-eya.pages.dev/screens/terminal/pending.png) |
+| ![decide → rule](https://handoff-eya.pages.dev/screens/terminal/decide.png) | ![inspect](https://handoff-eya.pages.dev/screens/terminal/inspect.png) |
+| ![ask](https://handoff-eya.pages.dev/screens/terminal/ask.png) | ![usage](https://handoff-eya.pages.dev/screens/terminal/usage.png) |
+| ![workflows](https://handoff-eya.pages.dev/screens/terminal/workflows.png) | ![agents + skills](https://handoff-eya.pages.dev/screens/terminal/agents-skills.png) |
+| ![mcp](https://handoff-eya.pages.dev/screens/terminal/mcp.png) | ![schedules + credentials](https://handoff-eya.pages.dev/screens/terminal/schedules-creds.png) |
+| ![git log](https://handoff-eya.pages.dev/screens/terminal/gitlog.png) | |
 </details>
 
 ### The browser
 
 | | |
 |---|---|
-| ![Overview](docs/screens/overview.png) | ![Activity](docs/screens/activity.png) |
+| ![Overview](https://handoff-eya.pages.dev/screens/overview.png) | ![Activity](https://handoff-eya.pages.dev/screens/activity.png) |
 | **Workspace overview** — latest runs, workflows, triggers, agents | **Activity** — the few things it needs you for, answerable inline |
-| ![Chat](docs/screens/chat.png) | ![Run inspector](docs/screens/run-inspector.png) |
+| ![Chat](https://handoff-eya.pages.dev/screens/chat.png) | ![Run inspector](https://handoff-eya.pages.dev/screens/run-inspector.png) |
 | **Chat** — a persisted Strands session; every tool call is a card | **Runs** — a waterfall of every model turn and tool call, with cost |
-| ![Agents](docs/screens/agent-workbench.png) | ![Tool servers](docs/screens/tool-servers.png) |
+| ![Agents](https://handoff-eya.pages.dev/screens/agent-workbench.png) | ![Tool servers](https://handoff-eya.pages.dev/screens/tool-servers.png) |
 | **Agents** — run any agent on a prompt; result, tool calls, trace | **Tool servers** — the MCP catalogue with a live invoker |
 
 <details>
@@ -317,12 +317,12 @@ into an active workflow; `handoff talk --mic` is the orb without the orb.
 
 | | |
 |---|---|
-| ![skills](docs/screens/ui/skills.png) | ![memory](docs/screens/ui/memory.png) |
-| ![usage](docs/screens/ui/usage.png) | ![settings](docs/screens/ui/settings.png) |
-| ![credentials](docs/screens/ui/credentials.png) | ![schedules](docs/screens/ui/schedules.png) |
-| ![discover](docs/screens/ui/discover.png) | ![docs](docs/screens/ui/docs.png) |
-| ![overview dark](docs/screens/ui/overview-dark.png) | ![activity dark](docs/screens/ui/activity-dark.png) |
-| ![settings dark](docs/screens/ui/settings-dark.png) | ![docs dark](docs/screens/ui/docs-dark.png) |
+| ![skills](https://handoff-eya.pages.dev/screens/ui/skills.png) | ![memory](https://handoff-eya.pages.dev/screens/ui/memory.png) |
+| ![usage](https://handoff-eya.pages.dev/screens/ui/usage.png) | ![settings](https://handoff-eya.pages.dev/screens/ui/settings.png) |
+| ![credentials](https://handoff-eya.pages.dev/screens/ui/credentials.png) | ![schedules](https://handoff-eya.pages.dev/screens/ui/schedules.png) |
+| ![discover](https://handoff-eya.pages.dev/screens/ui/discover.png) | ![docs](https://handoff-eya.pages.dev/screens/ui/docs.png) |
+| ![overview dark](https://handoff-eya.pages.dev/screens/ui/overview-dark.png) | ![activity dark](https://handoff-eya.pages.dev/screens/ui/activity-dark.png) |
+| ![settings dark](https://handoff-eya.pages.dev/screens/ui/settings-dark.png) | ![docs dark](https://handoff-eya.pages.dev/screens/ui/docs-dark.png) |
 </details>
 
 The platform around the gate — workspaces as `workspace.yml`, chat, activity,
@@ -338,7 +338,7 @@ page with the live orb, and the guides — built by `site/build.py` from
 
 | | |
 |---|---|
-| ![site](docs/screens/ui/site-hero.png) | ![site docs](docs/screens/ui/site-docs.png) |
+| ![site](https://handoff-eya.pages.dev/screens/ui/site-hero.png) | ![site docs](https://handoff-eya.pages.dev/screens/ui/site-docs.png) |
 
 ---
 
