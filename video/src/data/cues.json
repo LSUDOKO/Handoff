@@ -4,14 +4,14 @@
   "segments": [
    {
     "kind": "play",
-    "from": 10.14,
-    "to": 24.78,
+    "from": 7.4,
+    "to": 22.2,
     "rate": 1.0
    },
    {
     "kind": "play",
-    "from": 32.76,
-    "to": 40.26,
+    "from": 46.0,
+    "to": 54.6,
     "rate": 1.0
    }
   ]
@@ -21,9 +21,15 @@
   "segments": [
    {
     "kind": "play",
-    "from": 40.26,
-    "to": 75.866667,
-    "rate": 1.62
+    "from": 59.3,
+    "to": 72.5,
+    "rate": 1.0
+   },
+   {
+    "kind": "play",
+    "from": 120.5,
+    "to": 133.6,
+    "rate": 1.0
    }
   ]
  },
@@ -114,12 +120,12 @@
  },
  "timeline": {
   "setup": {
-   "listen_start": 11.34,
-   "listen_stop": 23.98,
-   "first_tool": 33.76,
-   "card": 38.66,
-   "graph": 39.59,
-   "needs": 78.02
+   "listen_start": 8.59,
+   "listen_stop": 21.36,
+   "first_tool": 46.0,
+   "card": 52.87,
+   "graph": 59.81,
+   "needs": 130.69
   },
   "decide": {
    "listen_start": 14.15,

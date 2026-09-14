@@ -31,7 +31,7 @@ every week.
 | **Live site and guides** | <https://handoff-eya.pages.dev> · [docs](https://handoff-eya.pages.dev/docs) |
 | **Pitch** | [deck (PDF)](docs/pitch/deck.pdf) · [deck (PPTX)](docs/pitch/deck.pptx) · [speaker script](docs/pitch/script.md) |
 | **Architecture** | [diagram (AWS icons)](https://handoff-eya.pages.dev/docs-assets/architecture-aws.png) · [draw.io source](docs/architecture.drawio) · [PDF](docs/architecture.pdf) · [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
-| **Demo video** | `ADD BEFORE SUBMITTING` · made by [`video/`](video/) and [`scripts/video/`](scripts/video/) — see [The film](#the-film) |
+| **Demo video** | [`video/out/handoff-demo.mp4`](video/out/handoff-demo.mp4) · made by [`video/`](video/) and [`scripts/video/`](scripts/video/) from live footage of the real inbox — see [The film](#the-film) |
 
 ---
 

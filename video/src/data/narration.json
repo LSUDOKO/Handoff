@@ -72,12 +72,12 @@
      "seconds": 4.416
     },
     {
-     "text": "Four tool calls later the agent has picked the integrations, written the cron, decided where the line sits between what it may do alone and what it must ask about, and switched it on.",
+     "text": "A few tool calls later the agent has picked the integrations, written the cron, decided where the line sits between what it may do alone and what it must ask about, and switched it on.",
      "file": "n-say-2.mp3",
-     "seconds": 9.264
+     "seconds": 9.144
     }
    ],
-   "seconds": 23.664
+   "seconds": 23.544
   },
   {
    "id": "run",
@@ -93,30 +93,30 @@
      "seconds": 4.44
     },
     {
-     "text": "Memory checks for rules. Gmail reads the inbox. The executor judges every message, acts on the clear ones, and sets one aside.",
+     "text": "Memory checks for rules. Gmail reads my real inbox. The executor judges every message and archives seventeen newsletters on its own.",
      "file": "n-run-2.mp3",
-     "seconds": 7.992
+     "seconds": 7.896
     },
     {
-     "text": "It did not freeze the inbox on the hard one. It finished the pass, and asked once.",
+     "text": "Nothing here is staged. That is my inbox this morning, and those archives are real.",
      "file": "n-run-3.mp3",
-     "seconds": 4.824
+     "seconds": 4.656
     }
    ],
-   "seconds": 19.824
+   "seconds": 19.56
   },
   {
    "id": "decision",
    "sentences": [
     {
-     "text": "One screen, one decision.",
+     "text": "And when it is not sure, it stops. One screen, one decision.",
      "file": "n-decision-0.mp3",
-     "seconds": 2.184
+     "seconds": 4.656
     },
     {
-     "text": "Here is why it stopped, in the agent's own words: The sender is unknown and the content suggests a potential partnership, which requires human review.",
+     "text": "From an earlier run, here is why it stopped, in the agent's own words: The sender is unknown and the content suggests a potential partnership, which requires human review.",
      "file": "n-decision-1.mp3",
-     "seconds": 7.944
+     "seconds": 9.24
     },
     {
      "text": "Sixty percent sure. It needs seventy to act alone. That gap is the product.",
@@ -129,7 +129,7 @@
      "seconds": 7.824
     }
    ],
-   "seconds": 22.824
+   "seconds": 26.592
   },
   {
    "id": "quieter",
@@ -142,7 +142,7 @@
     {
      "text": "Same inbox, next run: handled alone, the rest from rules, zero questions.",
      "file": "n-quieter-1.mp3",
-     "seconds": 5.352
+     "seconds": 5.4
     },
     {
      "text": "It gets quieter the longer you use it.",
@@ -150,7 +150,7 @@
      "seconds": 2.064
     }
    ],
-   "seconds": 13.752
+   "seconds": 13.8
   },
   {
    "id": "gate",
@@ -203,12 +203,12 @@
      "seconds": 3.264
     },
     {
-     "text": "Graph and GraphBuilder. The interrupt hook. Invocation hooks for the narrator that draws the graph. A session repository, so the terminal and the browser share one conversation. MCP clients for Gmail, Linear, Slack and GitHub.",
+     "text": "Graph and GraphBuilder. The interrupt hook. Invocation hooks for the narrator that draws the graph. A session repository, so the terminal and the browser share one conversation. MCP clients for Gmail, Linear, Slack, GitHub, Notion and Airtable.",
      "file": "n-strands-1.mp3",
-     "seconds": 13.656
+     "seconds": 15.192
     }
    ],
-   "seconds": 16.92
+   "seconds": 18.456
   },
   {
    "id": "aws",
@@ -224,12 +224,28 @@
      "seconds": 8.928
     },
     {
-     "text": "And handoff doctor proves every credential with a real call.",
+     "text": "And handoff doctor proves every credential with a real call. Eleven of them, Gmail to Airtable, all green.",
      "file": "n-aws-2.mp3",
-     "seconds": 3.264
+     "seconds": 6.528
     }
    ],
-   "seconds": 13.272
+   "seconds": 16.536
+  },
+  {
+   "id": "connected",
+   "sentences": [
+    {
+     "text": "Nothing here is a mock.",
+     "file": "n-connected-0.mp3",
+     "seconds": 1.464
+    },
+    {
+     "text": "Gmail signed in through its own OAuth. Linear, GitHub, Slack, Notion and Airtable on real tokens. The footage you just watched read a real inbox and acted on it.",
+     "file": "n-connected-1.mp3",
+     "seconds": 10.032
+    }
+   ],
+   "seconds": 11.496
   },
   {
    "id": "surfaces",

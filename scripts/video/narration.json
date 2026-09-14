@@ -30,7 +30,7 @@
       "sentences": [
         "This is Talk. I tap the orb and say it: every weekday at eight, triage my inbox, real asks become tickets, newsletters get archived, ask me about anything unsure.",
         "The caption fills in while I speak. That is Amazon Transcribe, streaming.",
-        "Four tool calls later the agent has picked the integrations, written the cron, decided where the line sits between what it may do alone and what it must ask about, and switched it on."
+        "A few tool calls later the agent has picked the integrations, written the cron, decided where the line sits between what it may do alone and what it must ask about, and switched it on."
       ]
     },
     {
@@ -38,15 +38,15 @@
       "sentences": [
         "And this is it running, on Amazon Bedrock.",
         "That graph is the Strands Graph itself, drawn live from its own hook events.",
-        "Memory checks for rules. Gmail reads the inbox. The executor judges every message, acts on the clear ones, and sets one aside.",
-        "It did not freeze the inbox on the hard one. It finished the pass, and asked once."
+        "Memory checks for rules. Gmail reads my real inbox. The executor judges every message and archives seventeen newsletters on its own.",
+        "Nothing here is staged. That is my inbox this morning, and those archives are real."
       ]
     },
     {
       "id": "decision",
       "sentences": [
-        "One screen, one decision.",
-        "Here is why it stopped, in the agent's own words: The sender is unknown and the content suggests a potential partnership, which requires human review.",
+        "And when it is not sure, it stops. One screen, one decision.",
+        "From an earlier run, here is why it stopped, in the agent's own words: The sender is unknown and the content suggests a potential partnership, which requires human review.",
         "Sixty percent sure. It needs seventy to act alone. That gap is the product.",
         "I say: archive it, it is cold outreach. Matched locally, no model round trip, and the run resumes exactly where it stopped."
       ]

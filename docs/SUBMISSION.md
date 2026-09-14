@@ -116,5 +116,5 @@ asking about that — and a wake word for the orb.
 - **Site and docs:** https://handoff-eya.pages.dev
 - **Pitch deck:** `docs/pitch/deck.pdf` (also `.pptx`) · **Script:** `docs/pitch/script.md`
 - **Architecture:** `docs/architecture-aws.png` (official AWS icons; editable `docs/architecture.drawio`) · detailed document `docs/architecture.pdf` · walkthrough `docs/ARCHITECTURE.md`
-- **Demo video:** `ADD BEFORE SUBMITTING`
+- **Demo video:** `video/out/handoff-demo.mp4` (Remotion; the say/run scenes are live footage of the real Gmail inbox, 17 messages archived by the agent)
 - **AWS Builder ID:** `ADD BEFORE SUBMITTING`
