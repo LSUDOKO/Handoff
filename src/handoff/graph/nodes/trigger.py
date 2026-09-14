@@ -14,7 +14,8 @@ def check_trigger(trigger_type: str, payload: dict | None = None) -> dict:
     """Confirm the workflow's trigger condition is satisfied.
 
     Args:
-        trigger_type: One of "cron", "webhook", "event" or "manual".
+        trigger_type: However the run was started — "cron", "webhook", "event",
+            "manual", or anything else ("voice", "chat", "api"), which counts as manual.
         payload: The raw signal body, for webhook and event triggers.
 
     Returns:

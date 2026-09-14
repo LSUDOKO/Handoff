@@ -43,10 +43,14 @@ from handoff.models import WorkflowConfig
 from handoff.platform.artifacts import create_artifact
 from handoff.tools.notify import notify_user
 
-TRIGGER_PROMPT = """You confirm whether a workflow should run.
+TRIGGER_PROMPT = """You record how a workflow run was started.
 
-Call check_trigger once with the trigger type you were given, then stop. Do not
-do any of the workflow's actual work — that is the executor's job."""
+Call check_trigger exactly once, passing the trigger type you were given
+verbatim — cron, webhook, event, manual, voice, chat, api, anything — and
+stop. The tool decides whether the run proceeds; you never do. A trigger type
+you have not seen before is still a valid way to start a run, not a reason to
+close it. Do not do any of the workflow's actual work — that is the executor's
+job."""
 
 
 EXECUTOR_PROMPT = """You are Handoff's Workflow Executor. You run a person's recurring task
@@ -75,7 +79,13 @@ Your reasoning is shown to the human verbatim when you escalate. Say exactly
 what you couldn't determine, so they can decide in five seconds.
 
 Most items should not need a human. Escalating more than a third of a batch
-is timidity, not care."""
+is timidity, not care.
+
+Never end the pass early because something looks unconfigured. No stored
+preferences means no rules yet — carry on. The confidence threshold is applied
+by the gate, not by you — carry on. A tool error on one item is one item: note
+it in that item's reasoning and continue with the rest. If fetch_unread_emails
+returns nothing, call finish_batch and stop; that is a complete pass."""
 
 
 COMPLETER_PROMPT = """You close out a workflow run.
